@@ -25,7 +25,9 @@
 #include <QtCore/QRegularExpression>
 
 #include <QtCore/QFuture>
+#if !defined(OVERTE_HEADLESS)
 #include <QtConcurrent/QtConcurrentRun>
+#endif
 
 #include <shared/LocalFileAccessGate.h>
 #include <shared/AbstractLoggerInterface.h>
@@ -47,7 +49,9 @@
 #include "ScriptCache.h"
 #include "ScriptContext.h"
 #include "XMLHttpRequestClass.h"
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include "WebSocketClass.h"
+#endif
 #include "ScriptEngine.h"
 #include "ScriptEngineCast.h"
 #include "ScriptEngineLogging.h"
@@ -813,8 +817,10 @@ void ScriptManager::init() {
         ScriptValue xmlHttpRequestConstructorValue = scriptEngine->newFunction(XMLHttpRequestClass::constructor);
         scriptEngine->globalObject().setProperty("XMLHttpRequest", xmlHttpRequestConstructorValue);
 
+#ifndef OVERTE_NO_QTWEBSOCKET
         ScriptValue webSocketConstructorValue = scriptEngine->newFunction(WebSocketClass::constructor);
         scriptEngine->globalObject().setProperty("WebSocket", webSocketConstructorValue);
+#endif
     }
 
     /*@jsdoc
@@ -2033,7 +2039,16 @@ QVariant ScriptManager::cloneEntityScriptDetails(const EntityItemID& entityID, c
 }
 
 QFuture<QVariant> ScriptManager::getLocalEntityScriptDetails(const EntityItemID& entityID, const QString& scriptURL) {
+#if defined(OVERTE_HEADLESS)
+    // QtConcurrent is not available in the headless build; resolve synchronously.
+    QFutureInterface<QVariant> future;
+    future.reportStarted();
+    future.reportResult(cloneEntityScriptDetails(entityID, scriptURL));
+    future.reportFinished();
+    return future.future();
+#else
     return QtConcurrent::run(this, &ScriptManager::cloneEntityScriptDetails, entityID, scriptURL);
+#endif
 }
 
 bool ScriptManager::getEntityScriptDetails(const EntityItemID& entityID, const QString& scriptURL, EntityScriptDetails &details) const {

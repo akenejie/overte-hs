@@ -102,7 +102,7 @@ void FileCache::initialize() {
         auto files = dir.entryList(nameFilters, filters, sort);
 
         // load persisted files
-        foreach(QString filename, files) {
+        for (const QString& filename : files) {
             const Key key = filename.section('.', 0, 0).toStdString();
             const std::string filepath = dir.filePath(filename).toStdString();
             const size_t length = QFileInfo(filepath.c_str()).size();

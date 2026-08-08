@@ -2,7 +2,9 @@
 #include "ImageLogging.h"
 #include "TextureProcessing.h"
 
+#if !defined(OVERTE_HEADLESS)
 #include <nvtt/nvtt.h>
+#endif
 
 using namespace image;
 
@@ -65,6 +67,74 @@ const glm::uint8* Image::getBits() const {
 }
 
 Image Image::getScaled(glm::uvec2 dstSize, AspectRatioMode ratioMode, TransformationMode transformMode) const {
+#if defined(OVERTE_HEADLESS)
+    if (_format != Format_PACKED_FLOAT && _format != Format_RGBAF) {
+        return _packedData.scaled(fromGlm(dstSize), ratioMode, transformMode);
+    }
+
+    glm::uvec2 target = dstSize;
+    if (ratioMode != Qt::IgnoreAspectRatio && _dims.y > 0) {
+        const float srcRatio = static_cast<float>(_dims.x) / static_cast<float>(_dims.y);
+        const float dstRatio = static_cast<float>(dstSize.x) / static_cast<float>(dstSize.y);
+        if ((ratioMode == Qt::KeepAspectRatio && dstRatio > srcRatio) ||
+            (ratioMode == Qt::KeepAspectRatioByExpanding && dstRatio < srcRatio)) {
+            target.y = static_cast<glm::uint32>(dstSize.x / srcRatio);
+        } else {
+            target.x = static_cast<glm::uint32>(dstSize.y * srcRatio);
+        }
+        target = glm::max(target, glm::uvec2(1, 1));
+    }
+
+    Image output(static_cast<int>(target.x), static_cast<int>(target.y), _format);
+    const int srcMaxX = _dims.x - 1;
+    const int srcMaxY = _dims.y - 1;
+
+    if (_format == Format_RGBAF) {
+        for (glm::uint32 y = 0; y < target.y; y++) {
+            for (glm::uint32 x = 0; x < target.x; x++) {
+                const float sx = (static_cast<float>(x) + 0.5f) * _dims.x / target.x - 0.5f;
+                const float sy = (static_cast<float>(y) + 0.5f) * _dims.y / target.y - 0.5f;
+                const int x0 = glm::clamp(static_cast<int>(glm::floor(sx)), 0, srcMaxX);
+                const int y0 = glm::clamp(static_cast<int>(glm::floor(sy)), 0, srcMaxY);
+                const int x1 = glm::min(x0 + 1, srcMaxX);
+                const int y1 = glm::min(y0 + 1, srcMaxY);
+                const float fx = glm::clamp(sx - x0, 0.0f, 1.0f);
+                const float fy = glm::clamp(sy - y0, 0.0f, 1.0f);
+                const auto p00 = getFloatPixel(x0, y0);
+                const auto p10 = getFloatPixel(x1, y0);
+                const auto p01 = getFloatPixel(x0, y1);
+                const auto p11 = getFloatPixel(x1, y1);
+                output.setFloatPixel(x, y, glm::mix(glm::mix(p00, p10, fx), glm::mix(p01, p11, fx), fy));
+            }
+        }
+    } else {
+        auto unpackFunc = getHDRUnpackingFunction();
+        auto packFunc = getHDRPackingFunction();
+        for (glm::uint32 y = 0; y < target.y; y++) {
+            glm::uint32* dstLine = reinterpret_cast<glm::uint32*>(output.editScanLine(static_cast<int>(y)));
+            for (glm::uint32 x = 0; x < target.x; x++) {
+                const float sx = (static_cast<float>(x) + 0.5f) * _dims.x / target.x - 0.5f;
+                const float sy = (static_cast<float>(y) + 0.5f) * _dims.y / target.y - 0.5f;
+                const int x0 = glm::clamp(static_cast<int>(glm::floor(sx)), 0, srcMaxX);
+                const int y0 = glm::clamp(static_cast<int>(glm::floor(sy)), 0, srcMaxY);
+                const int x1 = glm::min(x0 + 1, srcMaxX);
+                const int y1 = glm::min(y0 + 1, srcMaxY);
+                const float fx = glm::clamp(sx - x0, 0.0f, 1.0f);
+                const float fy = glm::clamp(sy - y0, 0.0f, 1.0f);
+                auto readPacked = [&](int px, int py) {
+                    return glm::vec4(unpackFunc(reinterpret_cast<const glm::uint32*>(getScanLine(py))[px]), 1.0f);
+                };
+                const auto p00 = readPacked(x0, y0);
+                const auto p10 = readPacked(x1, y0);
+                const auto p01 = readPacked(x0, y1);
+                const auto p11 = readPacked(x1, y1);
+                const glm::vec4 color = glm::mix(glm::mix(p00, p10, fx), glm::mix(p01, p11, fx), fy);
+                dstLine[x] = packFunc(glm::vec3(color));
+            }
+        }
+    }
+    return output;
+#else
     if (_format == Format_PACKED_FLOAT || _format == Format_RGBAF) {
         nvtt::Surface surface;
 
@@ -141,6 +211,7 @@ Image Image::getScaled(glm::uvec2 dstSize, AspectRatioMode ratioMode, Transforma
     } else {
         return _packedData.scaled(fromGlm(dstSize), ratioMode, transformMode);
     }
+#endif
 }
 
 Image Image::getConvertedToFormat(Format newFormat) const {

@@ -13,7 +13,9 @@
 #include <QStandardPaths>
 #include <QtCore/QThread>
 #include <QtCore/QUrl>
+#ifndef OVERTE_HEADLESS
 #include <QtWidgets/QFileDialog>
+#endif
 
 #include <shared/QtHelpers.h>
 #include <AssetClient.h>

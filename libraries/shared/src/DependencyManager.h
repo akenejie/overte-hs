@@ -29,7 +29,6 @@ class Dependency {
 public:
     typedef std::function<void(Dependency* pointer)> DeleterFunction;
 
-protected:
     virtual ~Dependency() {}
     virtual void customDeleter() {
         _customDeleter(this);

@@ -1,0 +1,339 @@
+# Build the single static overte-server binary for Linux, macOS and Windows,
+# name it overte-hs_v<version>_<os>_<arch> and draft a GitHub release with all
+# binaries. Works for the whole pipeline automatically on push to master.
+#
+# Concept (absolute requirement): a single self-contained binary + a data
+# folder copied next to it must host a VR space on ANY OS - no installer, no
+# admin rights, no Qt runtime, no machine-specific paths baked in. Ports are
+# command-line arguments. Windows production builds use MSVC (not MinGW).
+#
+# Build targets (binary name -> overte-hs_v0.1.0_<os>_<arch>):
+#   native    linux-amd64 (ubuntu-24.04),        linux-arm64 (ubuntu-24.04-arm),
+#             darwin-amd64 (macos-15-intel),     darwin-arm64 (macos-15)
+#   emulated  linux-386 (i386/ubuntu + QEMU),    linux-arm (arm32v7 + QEMU)
+#   windows   windows-amd64 (windows-2022, MSVC)
+#             (windows-arm64 excluded: needs an MSVC arm64 static Qt, unstarted)
+#
+# STATUS (honest): linux-amd64 is verified locally. linux-arm64 has a native
+# runner (high confidence); darwin*, linux-386/arm and windows-amd64 still need
+# CI iteration. windows-arm64 is excluded from the matrix until an MSVC arm64
+# static Qt exists (unstarted). The release job drafts the release with
+# whatever binaries succeeded, so a partial draft appears once targets go green.
+#
+# Pipeline (see BUILD_STATIC.md):
+#   1. cargo build --release            -> rust-udp static lib
+#   2. static Qt 5.15.13 + oneTBB, then conan install + cmake configure
+#   3. cmake --build build --target overte-server
+#   4. stage as dist/overte-hs_v<version>_<os>_<arch> and upload
+
+name: build-server
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  VERSION: 0.1.0
+  BINARY: overte-hs
+
+jobs:
+  # --- Native builds: Linux amd64/arm64, macOS amd64/arm64 -----------------
+  native:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-amd64
+            os: ubuntu-24.04
+            bin: linux_amd64
+            cache: linux-amd64
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            bin: linux_arm64
+            cache: linux-arm64
+          - name: darwin-amd64
+            os: macos-15-intel
+            bin: darwin_amd64
+            cache: macos-amd64
+          - name: darwin-arm64
+            os: macos-15
+            bin: darwin_arm64
+            cache: macos-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain (for rust-udp)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install build tools (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq g++ make cmake curl perl python3 python3-pip zlib1g-dev
+
+      - name: Install build tools (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install cmake
+          python3 -m pip install --quiet --break-system-packages conan
+
+      - name: Install conan (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: python3 -m pip install --quiet --break-system-packages conan
+
+      # Static Qt + oneTBB are the expensive part (~10-20 min); cache them per
+      # OS/arch so only conan+cmake run on cache hits.
+      - name: Cache static deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: overte-deps-${{ matrix.cache }}-${{ hashFiles('scripts/build-static-deps.sh') }}
+          restore-keys: |
+            overte-deps-${{ matrix.cache }}-
+
+      - name: Build rust-udp
+        run: |
+          cd rust-udp
+          cargo build --release
+
+      - name: Build static Qt/oneTBB + configure
+        run: bash scripts/build-static-deps.sh
+
+      - name: Build overte-server
+        run: cmake --build build --target overte-server -j"$(nproc)"
+
+      - name: Verify binary
+        run: |
+          test -x build/overte-server/overte-server
+          strings build/overte-server/overte-server | grep -q "qt_prfxpath=/" \
+            || { echo "error: qt_prfxpath is not neutral (machine path baked in)"; exit 1; }
+
+      - name: Stage release binary
+        run: |
+          mkdir -p dist
+          cp build/overte-server/overte-server \
+            dist/${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}
+          path: dist/${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}
+          if-no-files-found: error
+
+  # --- Emulated builds: Linux i386 (386) and armv7 (arm) -------------------
+  # GitHub has no 32-bit hosted runners, so the exact same pipeline runs
+  # natively inside a target-arch container under QEMU (setup-qemu registers
+  # binfmt on the host). OVERTE_BUILD_JOBS is kept low: QEMU emulation is slow.
+  emulated:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-386
+            image: i386/ubuntu:24.04
+            platform: linux/386
+            bin: linux_386
+            jobs: 4
+          - name: linux-arm
+            image: arm32v7/ubuntu:24.04
+            platform: linux/arm/v7
+            bin: linux_arm
+            jobs: 4
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: QEMU binfmt (cross-arch container support)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Cache static deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: overte-deps-${{ matrix.bin }}-${{ hashFiles('scripts/build-static-deps.sh') }}
+          restore-keys: |
+            overte-deps-${{ matrix.bin }}-
+
+      - name: Build in target-arch container
+        run: |
+          docker run --rm \
+            --platform "${{ matrix.platform }}" \
+            -v "$GITHUB_WORKSPACE:/work" -w /work \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e OVERTE_BUILD_JOBS="${{ matrix.jobs }}" \
+            -e BIN_NAME="${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}" \
+            "${{ matrix.image }}" \
+            bash -c '
+              set -euo pipefail
+              apt-get update -qq
+              apt-get install -y -qq g++ make cmake curl perl python3 python3-pip zlib1g-dev
+              python3 -m pip install --quiet --break-system-packages conan
+              curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              . "$HOME/.cargo/env"
+              cd rust-udp && cargo build --release && cd ..
+              bash scripts/build-static-deps.sh
+              cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}"
+              install -D -m 0755 build/overte-server/overte-server "/work/dist/${BIN_NAME}"
+            '
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}
+          path: dist/${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}
+          if-no-files-found: error
+
+  # --- Windows builds: MSVC (production toolchain) --------------------------
+  # windows-amd64 uses the MSVC pipeline (scripts/build-static-deps-windows.ps1).
+  # windows-arm64 is REMOVED from the matrix for now: it needs an MSVC arm64
+  # static Qt, which is unstarted porting work - it would only fail every run.
+  # Re-enable once the arm64 static Qt port lands:
+  #   - name: windows-arm64
+  #     os: windows-11-arm
+  #     bin: windows_arm64
+  windows:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-amd64
+            os: windows-2022
+            bin: windows_amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain (for rust-udp)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools (Perl, conan)
+        shell: pwsh
+        run: |
+          choco install -y --no-progress strawberryperl
+          python -m pip install --quiet conan
+
+      - name: Cache static deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: overte-deps-${{ matrix.bin }}-${{ hashFiles('scripts/build-static-deps-windows.ps1') }}
+          restore-keys: |
+            overte-deps-${{ matrix.bin }}-
+
+      - name: Build rust-udp
+        shell: pwsh
+        run: cargo build --release --manifest-path rust-udp/Cargo.toml
+
+      - name: Build static Qt/oneTBB + conan + configure (MSVC)
+        shell: pwsh
+        run: |
+          & powershell -ExecutionPolicy Bypass -File scripts/build-static-deps-windows.ps1
+
+      - name: Build overte-server
+        shell: pwsh
+        run: |
+          cmake --build build --target overte-server --config Release --parallel 4
+
+      - name: Verify binary
+        shell: pwsh
+        run: |
+          $exe = "build\overte-server\overte-server.exe"
+          if (-not (Test-Path $exe)) { throw "binary not found: $exe" }
+          # Byte-preserving scan for the neutral Qt prefix marker.
+          $text = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($exe))
+          if (-not $text.Contains("qt_prfxpath=/")) {
+            throw "qt_prfxpath is not neutral (machine path baked in)"
+          }
+
+      - name: Stage release binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build\overte-server\overte-server.exe `
+            dist\${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}
+          path: dist/${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}.exe
+          if-no-files-found: error
+
+  # --- Draft release ----------------------------------------------------------
+  # Runs even if some build jobs failed (always()); assembles a draft release
+  # from whatever binaries succeeded. Skips on pull_request.
+  release:
+    name: Draft release
+    needs: [native, emulated, windows]
+    if: |
+      always() && (github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/master'))
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download built binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: overte-hs_*
+          merge-multiple: true
+          path: dist
+
+      - name: Check binaries present
+        run: |
+          count=$(ls -1 dist 2>/dev/null | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "error: no binaries were built; not creating a release"
+            exit 1
+          fi
+          ls -l dist
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="v${{ env.VERSION }}"
+
+          # Safety rules:
+          #  - We only ever create a DRAFT and only ever update an existing DRAFT.
+          #  - A PUBLISHED release with the same tag is never modified or deleted;
+          #    instead the job fails loudly so a human resolves the conflict.
+          #  - Nothing in this job can delete or alter any other release/tag.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$tag" --json isDraft -q .isDraft)"
+            if [ "$is_draft" != "true" ]; then
+              echo "error: a PUBLISHED release '$tag' already exists - refusing to touch it." >&2
+              echo "delete it manually or bump VERSION to create a new draft, then re-run." >&2
+              exit 1
+            fi
+            gh release upload "$tag" dist/overte-hs_v${{ env.VERSION }}_* --clobber
+          else
+            gh release create "$tag" --draft \
+              --title "${{ env.BINARY }} v${{ env.VERSION }}" \
+              dist/overte-hs_v${{ env.VERSION }}_*
+          fi
+          gh release view "$tag" --json tagName,name,isDraft,assets -q \
+            '.tagName + " " + .name + " draft=" + (.isDraft|tostring)'

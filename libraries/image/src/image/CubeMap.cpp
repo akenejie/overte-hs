@@ -21,7 +21,9 @@
 #define M_PI    3.14159265359
 #endif
 
+#if !defined(OVERTE_HEADLESS)
 #include <nvtt/nvtt.h>
+#endif
 
 using namespace image;
 
@@ -307,6 +309,7 @@ private:
     }
 };
 
+#if !defined(OVERTE_HEADLESS)
 static void copySurface(const nvtt::Surface& source, glm::vec4* dest, size_t dstLineStride) {
     const float* srcRedIt = source.channel(0);
     const float* srcGreenIt = source.channel(1);
@@ -326,6 +329,7 @@ static void copySurface(const nvtt::Surface& source, glm::vec4* dest, size_t dst
         dest += dstLineStride;
     }
 }
+#endif
 
 CubeMap::CubeMap(int width, int height, int mipCount) {
     reset(width, height, mipCount);
@@ -336,6 +340,49 @@ CubeMap::CubeMap(const std::vector<Image>& faces, int mipCount, const std::atomi
 
     int face;
 
+#if defined(OVERTE_HEADLESS)
+    for (face = 0; face < 6; face++) {
+        Image faceImage = faces[face].getConvertedToFormat(Image::Format_RGBAF);
+
+        {
+            glm::vec4* dest = editFace(0, face);
+            for (int y = 0; y < getMipHeight(0); y++) {
+                for (int x = 0; x < getMipWidth(0); x++) {
+                    dest[y * getMipLineStride(0) + x] = faceImage.getFloatPixel(x, y);
+                }
+            }
+        }
+
+        for (gpu::uint16 mipLevel = 1; mipLevel < (gpu::uint16)mipCount; ++mipLevel) {
+            const int srcW = getMipWidth(mipLevel - 1);
+            const int srcH = getMipHeight(mipLevel - 1);
+            const size_t srcStride = getMipLineStride(mipLevel - 1);
+            const size_t dstStride = getMipLineStride(mipLevel);
+            const glm::vec4* src = editFace(mipLevel - 1, face);
+            glm::vec4* dst = editFace(mipLevel, face);
+
+            for (int y = 0; y < getMipHeight(mipLevel); y++) {
+                for (int x = 0; x < getMipWidth(mipLevel); x++) {
+                    glm::vec4 accum(0.0f);
+                    int count = 0;
+                    for (int dy = 0; dy < 2; dy++) {
+                        for (int dx = 0; dx < 2; dx++) {
+                            const int sx = std::min(x * 2 + dx, srcW - 1);
+                            const int sy = std::min(y * 2 + dy, srcH - 1);
+                            accum += src[sy * srcStride + sx];
+                            count++;
+                        }
+                    }
+                    dst[y * dstStride + x] = accum / static_cast<float>(count);
+                }
+            }
+        }
+
+        if (abortProcessing.load()) {
+            return;
+        }
+    }
+#else
     nvtt::Surface surface;
     surface.setAlphaMode(nvtt::AlphaMode_None);
     surface.setWrapMode(nvtt::WrapMode_Mirror);
@@ -356,6 +403,7 @@ CubeMap::CubeMap(const std::vector<Image>& faces, int mipCount, const std::atomi
             copySurface(surface, editFace(mipLevel, face), getMipLineStride(mipLevel));
         }
     }
+#endif
 
     if (abortProcessing.load()) {
         return;

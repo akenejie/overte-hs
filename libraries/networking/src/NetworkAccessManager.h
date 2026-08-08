@@ -14,7 +14,6 @@
 
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkRequest>
-#include <QtQml/QQmlNetworkAccessManagerFactory>
 
 /// Wrapper around QNetworkAccessManager to restrict at one instance by thread
 class NetworkAccessManager : public QNetworkAccessManager {

@@ -1,4 +1,7 @@
 macro(TARGET_DISCORD_RPC)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if (OVERTE_USE_SYSTEM_LIBS)
         find_path(DiscordRPC_INCLUDE_DIRS "discord_rpc.h")
 

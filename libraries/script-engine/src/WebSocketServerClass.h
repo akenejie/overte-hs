@@ -18,7 +18,9 @@
 #define hifi_WebSocketServerClass_h
 
 #include <QObject>
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include <QWebSocketServer>
+#endif
 #include "WebSocketClass.h"
 
 #include "ScriptValue.h"
@@ -83,6 +85,10 @@ class ScriptEngine;
  * };
  */
 /// Provides the <code><a href="https://apidocs.overte.org/WebSocketServer.html">WebSocketServer</a></code> scripting interface
+#if defined(OVERTE_NO_QTWEBSOCKET)
+class WebSocketClass;
+
+#else
 class WebSocketServerClass : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString url READ getURL)
@@ -126,6 +132,8 @@ signals:
     void newConnection(WebSocketClass* client);
 
 };
+
+#endif // OVERTE_NO_QTWEBSOCKET
 
 #endif // hifi_WebSocketServerClass_h
 

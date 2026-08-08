@@ -4,8 +4,13 @@ set(TARGET_NAME ice-server)
 setup_hifi_project(Network)
 
 # link the shared hifi libraries
-link_hifi_libraries(embedded-webserver networking shared)
-package_libraries_for_deployment()
+if (OVERTE_HEADLESS)
+    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/compat")
+    link_hifi_libraries(networking shared)
+else()
+    link_hifi_libraries(embedded-webserver networking shared)
+    package_libraries_for_deployment()
+endif()
 
 # find OpenSSL
 find_package(OpenSSL QUIET REQUIRED)

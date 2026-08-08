@@ -15,7 +15,11 @@ cmake_policy(VERSION 3.24...3.31)
 include(SelectLibraryConfigurations)
 
 # Instruct CMake to run moc automatically when needed.
-set(CMAKE_AUTOMOC ON)
+if (OVERTE_HEADLESS)
+    set(CMAKE_AUTOMOC ON)
+else()
+    set(CMAKE_AUTOMOC ON)
+endif()
 
 # Instruct CMake to run rcc automatically when needed
 set(CMAKE_AUTORCC ON)
@@ -31,8 +35,14 @@ project(overte)
 include("cmake/init.cmake")
 include("cmake/compiler.cmake")
 
+# Keep the delivered binaries free of the build machine's absolute paths: remap the
+# project root in __FILE__ / __BASE_FILE__ and in debug info to a neutral relative path.
+if (NOT WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=.")
+endif()
+
 # Guard against missing `-falign-functions`.
-if( NOT WIN32 )
+if( NOT WIN32 AND NOT OVERTE_HEADLESS )
     # Function alignment is necessary for V8 scripting engine! We will run into random crashes otherwise.
     # SetAlignedPointerInInternalField requires at least 2 byte alignment and -falign-functions will set alignment
     # to machine specific value which should be greater than 2.
@@ -44,8 +54,10 @@ if( NOT WIN32 )
 endif()
 
 # QT_NO_DEBUG isn't being defined on Windows, so we do that here.
-add_compile_definitions($<$<CONFIG:Release>:QT_NO_DEBUG>)
-add_compile_definitions($<$<CONFIG:RelWithDebInfo>:QT_NO_DEBUG>)
+if (NOT OVERTE_HEADLESS)
+    add_compile_definitions($<$<CONFIG:Release>:QT_NO_DEBUG>)
+    add_compile_definitions($<$<CONFIG:RelWithDebInfo>:QT_NO_DEBUG>)
+endif()
 
 #
 # OVERTE_WARNINGS
@@ -88,6 +100,7 @@ set(OVERTE_BUILD_MANUAL_TESTS OFF CACHE BOOL "Build manual tests.")
 set(OVERTE_BUILD_TOOLS ON CACHE BOOL "Build tools. Includes Oven, which is used for some server functionality.")
 set(OVERTE_BUILD_INSTALLER ON CACHE BOOL "Build installer.")
 set(OVERTE_DISABLE_QML OFF CACHE BOOL "Build without QML. (For graphics debugging.)")
+set(OVERTE_HEADLESS OFF CACHE BOOL "Build minimal headless server without Web UI, SSL, Qt GUI.")
 set(OVERTE_DOWNLOAD_SERVERLESS_CONTENT OFF CACHE BOOL "Download and setup default serverless content beside Interface.")
 set(OVERTE_RENDERING_BACKEND "OpenGL" CACHE STRING "Which rendering backend to compile with. Valid options are: 'OpenGL' and 'Vulkan'.")
 set(OVERTE_EXTERNAL_BUILD_ASSETS "https://build-deps.overte.org" CACHE INTERNAL "")
@@ -135,6 +148,9 @@ if (ANDROID)
   elseif(${HIFI_ANDROID_APP} STREQUAL "interface")
     add_definitions(-DANDROID_APP_INTERFACE)
   endif()
+elseif (OVERTE_HEADLESS)
+  # Headless mode - no Qt components needed
+  set(PLATFORM_QT_COMPONENTS "")
 else ()
   set(PLATFORM_QT_COMPONENTS WebEngine Xml)
   add_definitions(-DHAVE_EXT_clip_cull_distance)
@@ -145,7 +161,11 @@ if (OVERTE_USE_KHR_ROBUSTNESS)
   add_definitions(-DUSE_KHR_ROBUSTNESS)
 endif()
 
-if (OVERTE_RENDERING_BACKEND STREQUAL "OpenGL")
+if (OVERTE_HEADLESS)
+    # No rendering backend needed
+    add_definitions(-DGPU_POINTER_STORAGE_RAW)
+    set(PLATFORM_GL_BACKEND "")
+elseif (OVERTE_RENDERING_BACKEND STREQUAL "OpenGL")
     add_definitions(-DGPU_POINTER_STORAGE_RAW)
     #add_definitions(-DGPU_POINTER_STORAGE_SHARED) is this needed for GLES? or specifically for android?
     add_definitions(-DUSE_GL)
@@ -159,9 +179,11 @@ else()
     message(FATAL_ERROR "Invalid OVERTE_RENDERING_BACKEND set. Expected 'OpenGL', or 'Vulkan'. Got '${OVERTE_RENDERING_BACKEND}'")
 endif()
 
-foreach(PLATFORM_QT_COMPONENT ${PLATFORM_QT_COMPONENTS})
-  list(APPEND PLATFORM_QT_LIBRARIES "Qt5::${PLATFORM_QT_COMPONENT}")
-endforeach()
+if (NOT OVERTE_HEADLESS)
+    foreach(PLATFORM_QT_COMPONENT ${PLATFORM_QT_COMPONENTS})
+      list(APPEND PLATFORM_QT_LIBRARIES "Qt5::${PLATFORM_QT_COMPONENT}")
+    endforeach()
+endif()
 
 message(STATUS "Use optimized IK:      " ${OVERTE_USE_OPTIMIZED_IK})
 message(STATUS "Build server:          " ${OVERTE_BUILD_SERVER})
@@ -175,6 +197,16 @@ message(STATUS "DL serverless content: " ${OVERTE_DOWNLOAD_SERVERLESS_CONTENT})
 if (OVERTE_DISABLE_QML)
     message(STATUS "QML disabled!")
     add_definitions(-DDISABLE_QML)
+endif()
+
+if (OVERTE_HEADLESS)
+    message(STATUS "Headless mode enabled! (no Web UI, no SSL, no Qt GUI)")
+    add_definitions(-DOVERTE_HEADLESS -DOVERTE_NO_QTWEBSOCKET)
+    set(OVERTE_BUILD_CLIENT OFF CACHE BOOL "" FORCE)
+    set(OVERTE_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(OVERTE_BUILD_INSTALLER OFF CACHE BOOL "" FORCE)
+    # Add compat layer include path globally
+    include_directories(BEFORE "${CMAKE_SOURCE_DIR}/compat")
 endif()
 
 if (OVERTE_DISABLE_KTX_CACHE)
@@ -265,6 +297,8 @@ if (OVERTE_BUILD_SERVER)
   set_target_properties(domain-server PROPERTIES FOLDER "Apps")
   add_subdirectory(ice-server)
   set_target_properties(ice-server PROPERTIES FOLDER "Apps")
+  add_subdirectory(overte-server)
+  set_target_properties(overte-server PROPERTIES FOLDER "Apps")
 endif()
 
 if (OVERTE_BUILD_CLIENT)
@@ -286,8 +320,10 @@ if (OVERTE_BUILD_CLIENT)
 endif()
 
 if (OVERTE_BUILD_CLIENT OR OVERTE_BUILD_SERVER)
-  add_subdirectory(plugins)
-  add_subdirectory(server-console)
+  if (NOT OVERTE_HEADLESS)
+    add_subdirectory(plugins)
+    add_subdirectory(server-console)
+  endif()
 endif()
 
 endif()

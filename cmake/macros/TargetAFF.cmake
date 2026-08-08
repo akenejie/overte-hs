@@ -1,4 +1,7 @@
 macro(TARGET_AFF)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if(OVERTE_USE_SYSTEM_LIBS)
         find_path(AFF_INCLUDE_DIRS "artery-font/artery-font.h")
         target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${AFF_INCLUDE_DIRS})

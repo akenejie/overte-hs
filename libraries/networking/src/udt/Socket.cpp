@@ -171,8 +171,9 @@ qint64 Socket::writePacket(std::unique_ptr<Packet> packet, const SockAddr& sockA
         // because Qt can't invoke with the unique_ptr we have to release it here and re-construct in writeReliablePacket
 
         if (QThread::currentThread() != thread()) {
+            Packet* releasedPacket = packet.release();
             QMetaObject::invokeMethod(this, "writeReliablePacket", Qt::QueuedConnection,
-                                      Q_ARG(Packet*, packet.release()),
+                                      Q_ARG(Packet*, releasedPacket),
                                       Q_ARG(SockAddr, sockAddr));
         } else {
             writeReliablePacket(packet.release(), sockAddr);

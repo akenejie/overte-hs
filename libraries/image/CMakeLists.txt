@@ -1,5 +1,12 @@
 set(TARGET_NAME image)
+
+
 setup_hifi_library()
+if (OVERTE_HEADLESS)
+    # Headless servers do not link OpenEXR. Exclude the reader so the library
+    # builds without the OpenEXR headers.
+    set_source_files_properties(src/image/OpenEXRReader.cpp PROPERTIES HEADER_FILE_ONLY TRUE SKIP_AUTOMOC TRUE)
+endif()
 link_hifi_libraries(shared gpu)
 target_nvtt()
 target_tbb()

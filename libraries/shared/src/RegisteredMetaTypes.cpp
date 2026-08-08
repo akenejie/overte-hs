@@ -19,10 +19,13 @@
 #include <QtCore/QUuid>
 #include <QtCore/QRect>
 #include <QtCore/QVariant>
+#ifndef OVERTE_HEADLESS
 #include <QtGui/QColor>
 #include <QtGui/QVector2D>
 #include <QtGui/QVector3D>
+#include <QtGui/QVector4D>
 #include <QtGui/QQuaternion>
+#endif
 #include <QtNetwork/QAbstractSocket>
 #include <QJsonDocument>
 
@@ -64,11 +67,13 @@ glm::vec2 vec2FromVariant(const QVariant &object, bool& isValid) {
     if (object.canConvert<float>()) {
         result = glm::vec2(object.toFloat());
         isValid = true;
+#ifndef OVERTE_HEADLESS
     } else if (object.canConvert<QVector2D>()) {
         auto qvec2 = qvariant_cast<QVector2D>(object);
         result.x = qvec2.x();
         result.y = qvec2.y();
         isValid = true;
+#endif
     } else {
         auto map = object.toMap();
         auto x = map["x"];
@@ -116,6 +121,7 @@ glm::vec3 vec3FromVariant(const QVariant& object, bool& valid) {
     } else if (object.canConvert<float>()) {
         v = glm::vec3(object.toFloat());
         valid = true;
+#ifndef OVERTE_HEADLESS
     } else if (object.canConvert<QVector3D>()) {
         auto qvec3 = qvariant_cast<QVector3D>(object);
         v.x = qvec3.x();
@@ -138,6 +144,7 @@ glm::vec3 vec3FromVariant(const QVariant& object, bool& valid) {
             v.z = (uint8_t)qColor.blue();
             valid = true;
         }
+#endif
     } else {
         auto map = object.toMap();
         auto x = map["x"];
@@ -203,6 +210,7 @@ glm::u8vec3 u8vec3FromVariant(const QVariant& object, bool& valid) {
     } else if (object.canConvert<uint>()) {
         v = glm::vec3(object.toUInt());
         valid = true;
+#ifndef OVERTE_HEADLESS
     } else if (object.canConvert<QVector3D>()) {
         auto qvec3 = qvariant_cast<QVector3D>(object);
         v.x = (uint8_t)qvec3.x();
@@ -225,6 +233,7 @@ glm::u8vec3 u8vec3FromVariant(const QVariant& object, bool& valid) {
             v.z = (uint8_t)qColor.blue();
             valid = true;
         }
+#endif
     } else {
         auto map = object.toMap();
         auto x = map["x"];
@@ -287,6 +296,7 @@ glm::vec4 vec4FromVariant(const QVariant& object, bool& valid) {
     } else if (object.canConvert<float>()) {
         v = glm::vec4(object.toFloat());
         valid = true;
+#ifndef OVERTE_HEADLESS
     } else if (object.canConvert<QVector4D>()) {
         auto qvec4 = qvariant_cast<QVector4D>(object);
         v.x = qvec4.x();
@@ -294,6 +304,7 @@ glm::vec4 vec4FromVariant(const QVariant& object, bool& valid) {
         v.z = qvec4.z();
         v.w = qvec4.w();
         valid = true;
+#endif
     } else {
         auto map = object.toMap();
         auto x = map["x"];
@@ -393,6 +404,7 @@ glm::mat4 mat4FromVariant(const QVariant& object) {
 
 glm::quat quatFromVariant(const QVariant &object, bool& isValid) {
     glm::quat q;
+#ifndef OVERTE_HEADLESS
     if (object.canConvert<QQuaternion>()) {
         auto qquat = qvariant_cast<QQuaternion>(object);
         q.x = qquat.x();
@@ -408,7 +420,9 @@ glm::quat quatFromVariant(const QVariant &object, bool& isValid) {
             q = glm::quat();
         }
         isValid = true;
-    } else {
+    } else
+#endif
+    {
         auto map = object.toMap();
         q.x = map["x"].toFloat(&isValid);
         if (!isValid) {

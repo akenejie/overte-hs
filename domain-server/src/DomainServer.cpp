@@ -19,6 +19,7 @@
 #include <chrono>
 
 #include <QDir>
+#include <QDataStream>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -37,7 +38,9 @@
 #include <CrashAnnotations.h>
 #include <DependencyManager.h>
 #include <HifiConfigVariantMap.h>
+#ifndef OVERTE_HEADLESS
 #include <HTTPConnection.h>
+#endif
 #include <LogUtils.h>
 #include <NetworkingConstants.h>
 #include <MetaverseAPI.h>
@@ -52,10 +55,12 @@
 #include <Trace.h>
 #include <StatTracker.h>
 
+#ifndef OVERTE_HEADLESS
 #include "AssetsBackupHandler.h"
 #include "ContentSettingsBackupHandler.h"
-#include "DomainServerNodeData.h"
 #include "EntitiesBackupHandler.h"
+#endif
+#include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
 
 #include <Gzip.h>
@@ -89,6 +94,7 @@ bool DomainServer::_getTempName { false };
 QString DomainServer::_userConfigFilename;
 int DomainServer::_parentPID { -1 };
 bool DomainServer::_forceCrashReporting{false};
+int DomainServer::_customLocalPort { -1 };
 
 
 /// @brief The Domain server can proxy requests to the Directory Server, this function handles those forwarding requests.
@@ -99,6 +105,7 @@ bool DomainServer::_forceCrashReporting{false};
 /// @param requiredData (Optional) This data is required to be present for the request.
 /// @param optionalData (Optional) If provided, this optional data will be forwarded with the request.
 /// @param requireAccessToken Require a valid access token to be sent with this request.
+#ifndef OVERTE_HEADLESS
 bool DomainServer::forwardMetaverseAPIRequest(HTTPConnection* connection,
                                               const QUrl& requestUrl,
                                               const QString& metaversePath,
@@ -195,12 +202,15 @@ bool DomainServer::forwardMetaverseAPIRequest(HTTPConnection* connection,
 
     return true;
 }
+#endif
 
 DomainServer::DomainServer(int argc, char* argv[]) :
     QCoreApplication(argc, argv),
-    _gatekeeper(this),
-    _httpManager(QHostAddress::AnyIPv4, DOMAIN_SERVER_HTTP_PORT,
+    _gatekeeper(this)
+#ifndef OVERTE_HEADLESS
+    , _httpManager(QHostAddress::AnyIPv4, DOMAIN_SERVER_HTTP_PORT,
         QString("%1/resources/web/").arg(QCoreApplication::applicationDirPath()), this)
+#endif
 {
     static const QString CRASH_REPORTER = "crash_reporting.enable_crash_reporter";
 
@@ -254,8 +264,10 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     auto &ch = CrashHandler::getInstance();
     ch.setEnabled(_settingsManager.valueOrDefaultValueForKeyPath(CRASH_REPORTER).toBool());
 
+#ifndef OVERTE_HEADLESS
     qRegisterMetaType<DomainServerWebSessionData>("DomainServerWebSessionData");
     qRegisterMetaTypeStreamOperators<DomainServerWebSessionData>("DomainServerWebSessionData");
+#endif
 
     // make sure we hear about newly connected nodes from our gatekeeper
     connect(&_gatekeeper, &DomainGatekeeper::connectedNode, this, &DomainServer::handleConnectedNode);
@@ -274,6 +286,7 @@ DomainServer::DomainServer(int argc, char* argv[]) :
             this, &DomainServer::updateUpstreamNodes);
     setupGroupCacheRefresh();
 
+#ifndef OVERTE_HEADLESS
     optionallySetupOAuth();
 
     if (_oauthEnable) {
@@ -281,6 +294,7 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     }
 
     _settingsManager.apiRefreshGroupInformation();
+#endif
 
 #if defined(WEBRTC_DATA_CHANNELS)
     const QString WEBRTC_ENABLE = "webrtc.enable_webrtc";
@@ -325,7 +339,9 @@ DomainServer::DomainServer(int argc, char* argv[]) :
 
     // check for the temporary name parameter
     if (_getTempName) {
+#ifndef OVERTE_HEADLESS
         getTemporaryName();
+#endif
     }
 
     // send signal to DomainMetadata when descriptors changed
@@ -378,6 +394,7 @@ DomainServer::DomainServer(int argc, char* argv[]) :
         }
     }
 
+#ifndef OVERTE_HEADLESS
     if (QDir(getEntitiesDirPath()).mkpath(".")) {
         qCDebug(domain_server) << "Created entities data directory";
     }
@@ -394,14 +411,17 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     _contentManager->initialize(true);
 
     connect(_contentManager.get(), &DomainContentBackupManager::recoveryCompleted, this, &DomainServer::restart);
+#endif
 
     static const int NODE_PING_MONITOR_INTERVAL_MSECS = 1 * MSECS_PER_SECOND;
     _nodePingMonitorTimer = new QTimer{ this };
     connect(_nodePingMonitorTimer, &QTimer::timeout, this, &DomainServer::nodePingMonitor);
     _nodePingMonitorTimer->start(NODE_PING_MONITOR_INTERVAL_MSECS);
 
+#ifndef OVERTE_HEADLESS
     initializeExporter();
     initializeMetadataExporter();
+#endif
 }
 
 void DomainServer::parseCommandLine(int argc, char* argv[]) {
@@ -421,6 +441,9 @@ void DomainServer::parseCommandLine(int argc, char* argv[]) {
 
     const QCommandLineOption userConfigOption("user-config", "Pass user config file pass", "path");
     parser.addOption(userConfigOption);
+
+    const QCommandLineOption localPortOption({ "p", "port" }, "Domain server UDP port (command-line only)", "port");
+    parser.addOption(localPortOption);
 
     const QCommandLineOption parentPIDOption(PARENT_PID_OPTION, "PID of the parent process", "parent-pid");
     parser.addOption(parentPIDOption);
@@ -449,6 +472,15 @@ void DomainServer::parseCommandLine(int argc, char* argv[]) {
     if (parser.isSet(helpOption)) {
         QCoreApplication mockApp(argc, argv); // required for call to showHelp()
         parser.showHelp();
+        Q_UNREACHABLE();
+    }
+
+    // The UDP port is only configurable via the command line. It is intentionally not read
+    // from the settings/config files and not persisted there.
+    if (!parser.isSet(localPortOption)) {
+        std::cout << "Error: domain-server requires --port <port>" << std::endl;
+        QCoreApplication mockApp(argc, argv); // required for call to showHelp()
+        parser.showHelp(1);
         Q_UNREACHABLE();
     }
 
@@ -492,6 +524,19 @@ void DomainServer::parseCommandLine(int argc, char* argv[]) {
         _userConfigFilename = parser.value(userConfigOption);
     }
 
+    if (parser.isSet(localPortOption)) {
+        bool ok = false;
+        int customPort = parser.value(localPortOption).toInt(&ok);
+        if (ok && customPort > 0 && customPort <= MAX_PORT) {
+            _customLocalPort = customPort;
+        } else {
+            std::cout << "Invalid value for --port: " << parser.value(localPortOption).toStdString() << std::endl;
+            QCoreApplication mockApp(argc, argv); // required for call to showHelp()
+            parser.showHelp();
+            Q_UNREACHABLE();
+        }
+    }
+
     if (parser.isSet(parentPIDOption)) {
         bool ok = false;
         int parentPID = parser.value(parentPIDOption).toInt(&ok);
@@ -510,11 +555,14 @@ void DomainServer::parseCommandLine(int argc, char* argv[]) {
 DomainServer::~DomainServer() {
     qInfo() << "Domain Server is shutting down.";
 
+#ifndef OVERTE_HEADLESS
     if (_contentManager) {
         _contentManager->aboutToFinish();
         _contentManager->terminate();
     }
+#endif
 
+#ifndef OVERTE_HEADLESS
     if (_httpMetadataExporterManager) {
         _httpMetadataExporterManager->close();
         delete _httpMetadataExporterManager;
@@ -524,6 +572,7 @@ DomainServer::~DomainServer() {
         _httpExporterManager->close();
         delete _httpExporterManager;
     }
+#endif
 
     DependencyManager::destroy<AccountManager>();
 
@@ -558,6 +607,7 @@ QUuid DomainServer::getID() {
     return DependencyManager::get<LimitedNodeList>()->getSessionUUID();
 }
 
+#ifndef OVERTE_HEADLESS
 bool DomainServer::optionallyReadX509KeyAndCertificate() {
     const QString X509_CERTIFICATE_OPTION = "oauth.cert";
     const QString X509_PRIVATE_KEY_OPTION = "oauth.key";
@@ -649,8 +699,11 @@ bool DomainServer::optionallySetupOAuth() {
     return true;
 }
 
+#endif // OVERTE_HEADLESS
+
 static const QString METAVERSE_DOMAIN_ID_KEY_PATH = "metaverse.id";
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::getTemporaryName(bool force) {
     // check if we already have a domain ID
     QVariant idValueVariant = _settingsManager.valueForKeyPath(METAVERSE_DOMAIN_ID_KEY_PATH);
@@ -672,7 +725,9 @@ void DomainServer::getTemporaryName(bool force) {
     accountManager->sendRequest("/api/v1/domains/temporary", AccountManagerAuth::None,
                                 QNetworkAccessManager::PostOperation, callbackParameters);
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::handleTempDomainSuccess(QNetworkReply* requestReply) {
     QJsonObject jsonObject = QJsonDocument::fromJson(requestReply->readAll()).object();
 
@@ -718,11 +773,14 @@ void DomainServer::handleTempDomainSuccess(QNetworkReply* requestReply) {
             << "via domain-server relaunch or from the domain-server settings.";
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::handleTempDomainError(QNetworkReply* requestReply) {
     qWarning() << "A temporary name was requested but there was an error creating one. Please try again via domain-server relaunch"
         << "or from the domain-server settings.";
 }
+#endif
 
 const QString DOMAIN_CONFIG_ID_KEY = "id";
 
@@ -783,11 +841,17 @@ bool DomainServer::isPacketVerified(const udt::Packet& packet) {
 
 
 void DomainServer::setupNodeListAndAssignments() {
-    const QString CUSTOM_LOCAL_PORT_OPTION = "metaverse.local_port";
     static const QString ENABLE_PACKET_AUTHENTICATION = "metaverse.enable_packet_verification";
 
-    QVariant localPortValue = _settingsManager.valueOrDefaultValueForKeyPath(CUSTOM_LOCAL_PORT_OPTION);
-    int domainServerPort = localPortValue.toInt();
+    // The listening port comes exclusively from the --port command-line argument.
+    // It is never read from the settings/config files.
+    int domainServerPort = _customLocalPort;
+
+    if (domainServerPort == -1) {
+        qCritical() << "domain-server requires --port; the UDP port is only configurable via the command line";
+        QCoreApplication::exit(EXIT_FAILURE);
+        return;
+    }
 
     int domainServerDTLSPort = INVALID_PORT;
 
@@ -907,10 +971,12 @@ void DomainServer::setupNodeListAndAssignments() {
     packetReceiver.registerListener(PacketType::OctreeDataPersist,
         PacketReceiver::makeUnsourcedListenerReference<DomainServer>(this, &DomainServer::processOctreeDataPersistMessage));
 
+#ifndef OVERTE_HEADLESS
     packetReceiver.registerListener(PacketType::OctreeFileReplacement,
         PacketReceiver::makeUnsourcedListenerReference<DomainServer>(this, &DomainServer::handleOctreeFileReplacementRequest));
     packetReceiver.registerListener(PacketType::DomainContentReplacementFromUrl,
         PacketReceiver::makeUnsourcedListenerReference<DomainServer>(this, &DomainServer::handleDomainContentReplacementFromURLRequest));
+#endif
 
     // set a custom packetVersionMatch as the verify packet operator for the udt::Socket
     nodeList->setPacketFilterOperator(&DomainServer::isPacketVerified);
@@ -993,6 +1059,9 @@ void DomainServer::forwardAssignmentClientSignalingMessageToUserClient(QSharedPo
 
 
 bool DomainServer::resetAccountManagerAccessToken() {
+#if defined(OVERTE_HEADLESS)
+    return false;
+#else
     if (!_oauthProviderURL.isEmpty()) {
         // check for an access-token in our settings, can optionally be overidden by env value
         const QString ENV_ACCESS_TOKEN_KEY = "DOMAIN_SERVER_ACCESS_TOKEN";
@@ -1035,6 +1104,7 @@ bool DomainServer::resetAccountManagerAccessToken() {
 
         return false;
     }
+#endif
 }
 
 void DomainServer::setupAutomaticNetworking() {
@@ -1159,7 +1229,7 @@ void DomainServer::parseAssignmentConfigs(QSet<Assignment::Type>& excludedTypes)
 void DomainServer::addStaticAssignmentToAssignmentHash(Assignment* newAssignment) {
     qDebug() << "Inserting assignment" << *newAssignment << "to static assignment hash.";
     newAssignment->setIsStatic(true);
-    _allAssignments.insert(newAssignment->getUUID(), SharedAssignmentPointer(newAssignment));
+    _allAssignments.insert(newAssignment->getUUID(), DomainAssignmentPointer(newAssignment));
 }
 
 void DomainServer::populateStaticScriptedAssignmentsFromSettings() {
@@ -1230,7 +1300,7 @@ void DomainServer::createStaticAssignmentsForType(Assignment::Type type, const Q
                 payloadStringList << QString("%1%2 %3").arg(dashes).arg(payloadKey).arg(configMap[payloadKey].toString());
             }
 
-            configAssignment->setPayload(payloadStringList.join(' ').toUtf8());
+            configAssignment->setPayload(payloadStringList.join(" ").toUtf8());
 
             addStaticAssignmentToAssignmentHash(configAssignment);
         }
@@ -1314,6 +1384,7 @@ unsigned int DomainServer::countConnectedUsers() {
     return result;
 }
 
+#ifndef OVERTE_HEADLESS
 QUrl DomainServer::oauthRedirectURL() {
     if (_httpsManager) {
         return QString("https://%1:%2/oauth").arg(_hostname).arg(_httpsManager->serverPort());
@@ -1322,10 +1393,12 @@ QUrl DomainServer::oauthRedirectURL() {
         return QUrl();
     }
 }
+#endif
 
 const QString OAUTH_CLIENT_ID_QUERY_KEY = "client_id";
 const QString OAUTH_REDIRECT_URI_QUERY_KEY = "redirect_uri";
 
+#ifndef OVERTE_HEADLESS
 QUrl DomainServer::oauthAuthorizationURL(const QUuid& stateUUID) {
     // for now these are all interface clients that have a GUI
     // so just send them back the full authorization URL
@@ -1352,6 +1425,7 @@ QUrl DomainServer::oauthAuthorizationURL(const QUuid& stateUUID) {
 
     return authorizationURL;
 }
+#endif
 
 void DomainServer::handleConnectedNode(SharedNodePointer newNode, quint64 requestReceiveTime) {
     DomainServerNodeData* nodeData = static_cast<DomainServerNodeData*>(newNode->getLinkedData());
@@ -1516,7 +1590,7 @@ void DomainServer::processRequestAssignmentPacket(QSharedPointer<ReceivedMessage
                  << "from" << message->getSenderSockAddr();
     }
 
-    SharedAssignmentPointer assignmentToDeploy = deployableAssignmentForRequest(requestAssignment);
+    DomainAssignmentPointer assignmentToDeploy = deployableAssignmentForRequest(requestAssignment);
 
     if (assignmentToDeploy) {
         qDebug() << "Deploying assignment -" << *assignmentToDeploy.data() << "- to" << message->getSenderSockAddr();
@@ -1688,7 +1762,9 @@ void DomainServer::handleMetaverseHeartbeatError(QNetworkReply* requestReply) {
         static int attempt = 0;
         if (++attempt < MAX_ATTEMPTS) {
             // get a new temporary name and token
+#ifndef OVERTE_HEADLESS
             getTemporaryName(true);
+#endif
         } else {
             qWarning() << "Already attempted too many temporary domain requests. Please set a domain ID manually or restart.";
         }
@@ -2035,7 +2111,7 @@ QJsonObject DomainServer::jsonObjectForNode(const SharedNodePointer& node) {
     nodeJson[JSON_KEY_USERNAME] = nodeData->getUsername();
     nodeJson[JSON_KEY_VERSION] = nodeData->getNodeVersion();
 
-    SharedAssignmentPointer matchingAssignment = _allAssignments.value(nodeData->getAssignmentUUID());
+    DomainAssignmentPointer matchingAssignment = _allAssignments.value(nodeData->getAssignmentUUID());
     if (matchingAssignment) {
         nodeJson[JSON_KEY_POOL] = matchingAssignment->getPool();
     }
@@ -2061,6 +2137,7 @@ QString pathForAssignmentScript(const QUuid& assignmentUUID) {
     return directory.absoluteFilePath(uuidStringWithoutCurlyBraces(assignmentUUID));
 }
 
+#ifndef OVERTE_HEADLESS
 QString DomainServer::pathForRedirect(QString path) const {
     // make sure the passed path has a leading slash
     if (!path.startsWith('/')) {
@@ -2069,10 +2146,12 @@ QString DomainServer::pathForRedirect(QString path) const {
 
     return "http://" + _hostname + ":" + QString::number(_httpManager.serverPort()) + path;
 }
+#endif
 
 
 
 const QString URI_OAUTH = "/oauth";
+#ifndef OVERTE_HEADLESS
 bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
     const QString JSON_MIME_TYPE = "application/json";
 
@@ -2130,7 +2209,7 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
             return true;
         }
 
-        SharedAssignmentPointer matchingAssignment = _allAssignments.value(nodeData->getAssignmentUUID());
+        DomainAssignmentPointer matchingAssignment = _allAssignments.value(nodeData->getAssignmentUUID());
 
         // check if we have an assignment that matches this temp UUID, and it is a scripted assignment
         if (matchingAssignment && matchingAssignment->getType() == Assignment::AgentType) {
@@ -2219,7 +2298,7 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
             QJsonObject queuedAssignmentsJSON;
 
             // add the queued but unfilled assignments to the json
-            foreach(const SharedAssignmentPointer& assignment, _unfulfilledAssignments) {
+            foreach(const DomainAssignmentPointer& assignment, _unfulfilledAssignments) {
                 QJsonObject queuedAssignmentJSON;
 
                 QString uuidString = uuidStringWithoutCurlyBraces(assignment->getUUID());
@@ -2397,7 +2476,7 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
                 _ephemeralACScripts[scriptAssignment->getUUID()] = formData[0].second;
 
                 // add the script assignment to the assignment queue
-                SharedAssignmentPointer sharedScriptedAssignment(scriptAssignment);
+                DomainAssignmentPointer sharedScriptedAssignment(scriptAssignment);
                 _unfulfilledAssignments.enqueue(sharedScriptedAssignment);
                 _allAssignments.insert(sharedScriptedAssignment->getUUID(), sharedScriptedAssignment);
             }
@@ -2632,10 +2711,12 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
     // didn't process the request, let our DomainServerSettingsManager or HTTPManager handle
     return _settingsManager.handleAuthenticatedHTTPRequest(connection, url);
 }
+#endif
 
 static const QString HIFI_SESSION_COOKIE_KEY = "DS_WEB_SESSION_UUID";
 static const QString STATE_QUERY_KEY = "state";
 
+#ifndef OVERTE_HEADLESS
 bool DomainServer::handleHTTPSRequest(HTTPSConnection* connection, const QUrl &url, bool skipSubHandler) {
     if (url.path() == URI_OAUTH) {
 
@@ -2682,7 +2763,9 @@ bool DomainServer::handleHTTPSRequest(HTTPSConnection* connection, const QUrl &u
         return false;
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 bool DomainServer::processPendingContent(HTTPConnection* connection, QString itemName, QString filename, QByteArray dataChunk) {
     static const QString UPLOAD_SESSION_KEY { "X-Session-Id" };
     QByteArray sessionIdBytes = connection->requestHeader(UPLOAD_SESSION_KEY);
@@ -2753,7 +2836,9 @@ bool DomainServer::processPendingContent(HTTPConnection* connection, QString ite
 
     return true;
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 HTTPSConnection* DomainServer::connectionFromReplyWithState(QNetworkReply* reply) {
     // grab the UUID state property from the reply
     QUuid stateUUID = reply->property(STATE_QUERY_KEY.toLocal8Bit()).toUuid();
@@ -2764,7 +2849,9 @@ HTTPSConnection* DomainServer::connectionFromReplyWithState(QNetworkReply* reply
         return nullptr;
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::tokenGrantFinished() {
     auto tokenReply = qobject_cast<QNetworkReply*>(sender());
 
@@ -2789,7 +2876,9 @@ void DomainServer::tokenGrantFinished() {
         tokenReply->deleteLater();
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::profileRequestFinished() {
 
     auto profileReply = qobject_cast<QNetworkReply*>(sender());
@@ -2814,7 +2903,9 @@ void DomainServer::profileRequestFinished() {
         profileReply->deleteLater();
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 QString DomainServer::operationToString(const QNetworkAccessManager::Operation &op) {
     switch(op) {
         case QNetworkAccessManager::Operation::HeadOperation: return "HEAD";
@@ -2828,7 +2919,9 @@ QString DomainServer::operationToString(const QNetworkAccessManager::Operation &
             return "UNKNOWN";
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 std::pair<bool, QString>  DomainServer::isAuthenticatedRequest(HTTPConnection* connection) {
 
     static const QByteArray HTTP_COOKIE_HEADER_KEY = "Cookie";
@@ -2989,8 +3082,10 @@ std::pair<bool, QString>  DomainServer::isAuthenticatedRequest(HTTPConnection* c
         return { true, QString() };
     }
 }
+#endif
 
 const QString OAUTH_JSON_ACCESS_TOKEN_KEY = "access_token";
+#ifndef OVERTE_HEADLESS
 QNetworkReply* DomainServer::profileRequestGivenTokenReply(QNetworkReply* tokenReply) {
     // pull the access token from the returned JSON and store it with the matching session UUID
     QJsonDocument returnedJSON = QJsonDocument::fromJson(tokenReply->readAll());
@@ -3008,7 +3103,9 @@ QNetworkReply* DomainServer::profileRequestGivenTokenReply(QNetworkReply* tokenR
     profileRequest.setHeader(QNetworkRequest::UserAgentHeader, NetworkingConstants::OVERTE_USER_AGENT);
     return NetworkAccessManager::getInstance().get(profileRequest);
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 Headers DomainServer::setupCookieHeadersFromProfileReply(QNetworkReply* profileReply) {
     Headers cookieHeaders;
 
@@ -3036,8 +3133,9 @@ Headers DomainServer::setupCookieHeadersFromProfileReply(QNetworkReply* profileR
 
     return cookieHeaders;
 }
+#endif
 
-void DomainServer::refreshStaticAssignmentAndAddToQueue(SharedAssignmentPointer& assignment) {
+void DomainServer::refreshStaticAssignmentAndAddToQueue(DomainAssignmentPointer& assignment) {
     QUuid oldUUID = assignment->getUUID();
     assignment->resetUUID();
 
@@ -3174,6 +3272,7 @@ void DomainServer::updateUpstreamNodes() {
     updateReplicationNodes(Upstream);
 }
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::initializeExporter() {
     static const QString ENABLE_EXPORTER = "monitoring.enable_prometheus_exporter";
     static const QString EXPORTER_PORT = "monitoring.prometheus_exporter_port";
@@ -3199,7 +3298,9 @@ void DomainServer::initializeExporter() {
         );
     }
 }
+#endif
 
+#ifndef OVERTE_HEADLESS
 void DomainServer::initializeMetadataExporter() {
     static const QString ENABLE_EXPORTER = "metaverse.enable_metadata_exporter";
     static const QString EXPORTER_PORT = "metaverse.metadata_exporter_port";
@@ -3225,6 +3326,7 @@ void DomainServer::initializeMetadataExporter() {
         );
     }
 }
+#endif
 
 void DomainServer::updateReplicatedNodes() {
     // Make sure we have downstream nodes in our list
@@ -3293,7 +3395,7 @@ void DomainServer::nodeKilled(SharedNodePointer node) {
     if (nodeData) {
         // if this node's UUID matches a static assignment we need to throw it back in the assignment queue
         if (!nodeData->getAssignmentUUID().isNull()) {
-            SharedAssignmentPointer matchedAssignment = _allAssignments.take(nodeData->getAssignmentUUID());
+            DomainAssignmentPointer matchedAssignment = _allAssignments.take(nodeData->getAssignmentUUID());
 
             if (matchedAssignment && matchedAssignment->isStatic()) {
                 refreshStaticAssignmentAndAddToQueue(matchedAssignment);
@@ -3323,8 +3425,8 @@ void DomainServer::nodeKilled(SharedNodePointer node) {
     broadcastNodeDisconnect(node);
 }
 
-SharedAssignmentPointer DomainServer::dequeueMatchingAssignment(const QUuid& assignmentUUID, NodeType_t nodeType) {
-    QQueue<SharedAssignmentPointer>::iterator i = _unfulfilledAssignments.begin();
+DomainAssignmentPointer DomainServer::dequeueMatchingAssignment(const QUuid& assignmentUUID, NodeType_t nodeType) {
+    QQueue<DomainAssignmentPointer>::iterator i = _unfulfilledAssignments.begin();
 
     while (i != _unfulfilledAssignments.end()) {
         if (i->data()->getType() == Assignment::typeForNodeType(nodeType)
@@ -3338,13 +3440,13 @@ SharedAssignmentPointer DomainServer::dequeueMatchingAssignment(const QUuid& ass
         }
     }
 
-    return SharedAssignmentPointer();
+    return DomainAssignmentPointer();
 }
 
-SharedAssignmentPointer DomainServer::deployableAssignmentForRequest(const Assignment& requestAssignment) {
+DomainAssignmentPointer DomainServer::deployableAssignmentForRequest(const Assignment& requestAssignment) {
     // this is an unassigned client talking to us directly for an assignment
     // go through our queue and see if there are any assignments to give out
-    QQueue<SharedAssignmentPointer>::iterator sharedAssignment = _unfulfilledAssignments.begin();
+    QQueue<DomainAssignmentPointer>::iterator sharedAssignment = _unfulfilledAssignments.begin();
 
     while (sharedAssignment != _unfulfilledAssignments.end()) {
         Assignment* assignment = sharedAssignment->data();
@@ -3356,7 +3458,7 @@ SharedAssignmentPointer DomainServer::deployableAssignmentForRequest(const Assig
         if ((requestIsAllTypes || assignmentTypesMatch) && (neitherHasPool || assignmentPoolsMatch)) {
 
             // remove the assignment from the queue
-            SharedAssignmentPointer deployableAssignment = _unfulfilledAssignments.takeAt(sharedAssignment
+            DomainAssignmentPointer deployableAssignment = _unfulfilledAssignments.takeAt(sharedAssignment
                                                                                           - _unfulfilledAssignments.begin());
 
             // until we get a connection for this assignment
@@ -3371,7 +3473,7 @@ SharedAssignmentPointer DomainServer::deployableAssignmentForRequest(const Assig
         }
     }
 
-    return SharedAssignmentPointer();
+    return DomainAssignmentPointer();
 }
 
 void DomainServer::addStaticAssignmentsToQueue() {
@@ -3381,7 +3483,7 @@ void DomainServer::addStaticAssignmentsToQueue() {
     auto sharedAssignments = _allAssignments.values();
 
     // sort the assignments to put the server/mixer assignments first
-    std::sort(sharedAssignments.begin(), sharedAssignments.end(), [](SharedAssignmentPointer a, SharedAssignmentPointer b){
+    std::sort(sharedAssignments.begin(), sharedAssignments.end(), [](DomainAssignmentPointer a, DomainAssignmentPointer b){
         if (a->getType() == b->getType()) {
             return true;
         } else if (a->getType() != Assignment::AgentType && b->getType() != Assignment::AgentType) {
@@ -3714,6 +3816,7 @@ void DomainServer::maybeHandleReplacementEntityFile() {
     }
 }
 
+#ifndef OVERTE_HEADLESS
 bool DomainServer::handleOctreeFileReplacement(QByteArray octreeFile, QString sourceFilename, QString name, QString username) {
     OctreeUtils::RawEntityData data;
     if (data.readOctreeDataInfoFromData(octreeFile)) {
@@ -3804,6 +3907,7 @@ void DomainServer::handleOctreeFileReplacementRequest(QSharedPointer<ReceivedMes
         handleOctreeFileReplacement(message->readAll(), QString(), QString(), username);
     }
 }
+#endif
 
 void DomainServer::processAvatarZonePresencePacket(QSharedPointer<ReceivedMessage> message) {
     // FIXME: this, and PacketType::AvatarZonePresence in general, appear to be unused/unimplemented

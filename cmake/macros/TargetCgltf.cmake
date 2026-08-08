@@ -1,4 +1,7 @@
 macro(TARGET_CGLTF)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if (OVERTE_USE_SYSTEM_LIBS)
         find_path(CGLTF_INCLUDE_DIRS "cgltf.h")
 

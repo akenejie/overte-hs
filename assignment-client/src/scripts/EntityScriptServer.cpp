@@ -33,7 +33,9 @@
 #include <ScriptEngines.h>
 #include <SoundCacheScriptingInterface.h>
 #include <UUID.h>
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include <WebSocketServerClass.h>
+#endif
 
 #include <EntityScriptClient.h> // for EntityScriptServerServices
 
@@ -479,8 +481,10 @@ void EntityScriptServer::resetEntitiesScriptEngine() {
     {
         auto guard = newEngine->getScopeGuard();
         {
+#ifndef OVERTE_NO_QTWEBSOCKET
             auto webSocketServerConstructorValue = newEngine->newFunction(WebSocketServerClass::constructor);
             newEngine->globalObject().setProperty("WebSocketServer", webSocketServerConstructorValue);
+#endif
         }
 
         newEngine->registerGlobalObject(guard.get(), "SoundCache", DependencyManager::get<SoundCacheScriptingInterface>().data());

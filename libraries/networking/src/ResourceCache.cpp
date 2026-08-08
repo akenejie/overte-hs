@@ -55,7 +55,7 @@ QList<QSharedPointer<Resource>> ResourceCacheSharedItems::getPendingRequests() c
     QList<QSharedPointer<Resource>> result;
     Lock lock(_mutex);
 
-    foreach (QWeakPointer<Resource> resource, _pendingRequests) {
+    for (const auto& resource : _pendingRequests) {
         auto locked = resource.lock();
         if (locked) {
             result.append(locked);
@@ -74,7 +74,7 @@ QList<std::pair<QSharedPointer<Resource>, float>> ResourceCacheSharedItems::getL
     QList<std::pair<QSharedPointer<Resource>, float>> result;
     Lock lock(_mutex);
 
-    foreach(auto resourcePair, _loadingRequests) {
+    for(auto& resourcePair : _loadingRequests) {
         auto locked = resourcePair.first.lock();
         if (locked) {
             result.append({ locked, resourcePair.second });
@@ -226,9 +226,10 @@ ScriptableResource* ResourceCache::prefetch(const QUrl& url, void* extra, size_t
 
     if (QThread::currentThread() != thread()) {
         // Must be called in thread to ensure getResource returns a valid pointer
+        QThread* currentThread = QThread::currentThread();
         BLOCKING_INVOKE_METHOD(this, "prefetchAndMoveToThread",
             Q_RETURN_ARG(ScriptableResource*, result),
-            Q_ARG(QUrl, url), Q_ARG(void*, extra), Q_ARG(size_t, extraHash), Q_ARG(QThread*, QThread::currentThread()));
+            Q_ARG(QUrl, url), Q_ARG(void*, extra), Q_ARG(size_t, extraHash), Q_ARG(QThread*, currentThread));
         return result;
     }
 
@@ -472,8 +473,8 @@ void ResourceCache::clearUnusedResources() {
     // list on destruction, so keep clearing until there are no references left
     QWriteLocker locker(&_unusedResourcesLock);
     while (!_unusedResources.isEmpty()) {
-        foreach (const QSharedPointer<Resource>& resource, _unusedResources) {
-            resource->setCache(nullptr);
+        for (auto it = _unusedResources.constBegin(); it != _unusedResources.constEnd(); ++it) {
+            it.value()->setCache(nullptr);
         }
         _unusedResources.clear();
     }

@@ -24,8 +24,18 @@
 #include <crash-handler/CrashHandler.h>
 
 
-int main(int argc, char* argv[]) {
+#ifdef OVERTE_MULTICALL_APPLET
+int domainServerMain(int argc, char* argv[])
+#else
+int main(int argc, char* argv[])
+#endif
+{
     setupHifiApplication(BuildInfo::DOMAIN_SERVER_NAME);
+
+#ifdef OVERTE_MULTICALL_APPLET
+    // register the embedded describe-settings.json resource
+    Q_INIT_RESOURCE(resources);
+#endif
 
     DomainServer::parseCommandLine(argc, argv);
 

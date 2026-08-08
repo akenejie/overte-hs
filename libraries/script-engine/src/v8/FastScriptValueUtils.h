@@ -21,9 +21,13 @@
 
 #include "../ScriptValue.h"
 
+// The V8-optimized implementations live in FastScriptValueUtils.cpp which is
+// not compiled for headless servers (they don't link libnode). Without the
+// macro, ScriptValueUtils.cpp provides the generic implementations instead.
+#if !defined(OVERTE_HEADLESS)
 #define CONVERSIONS_OPTIMIZED_FOR_V8
+#endif
 
-#ifdef CONVERSIONS_OPTIMIZED_FOR_V8
 ScriptValue qBytearrayToScriptValue(ScriptEngine* engine, const QByteArray &qByteArray);
 
 bool qBytearrayFromScriptValue(const ScriptValue& object, QByteArray &qByteArray);
@@ -31,6 +35,5 @@ bool qBytearrayFromScriptValue(const ScriptValue& object, QByteArray &qByteArray
 ScriptValue vec3ToScriptValue(ScriptEngine* engine, const glm::vec3& vec3);
 
 bool vec3FromScriptValue(const ScriptValue& object, glm::vec3& vec3);
-#endif
 
 #endif  // overte_FastScriptValueUtils_h

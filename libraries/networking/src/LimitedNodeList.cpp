@@ -624,7 +624,7 @@ void LimitedNodeList::eraseAllNodes(QString reason) {
         _nodeHash.clear();
     }
 
-    foreach(const SharedNodePointer& killedNode, killedNodes) {
+    for(const auto& killedNode : killedNodes) {
         handleNodeKill(killedNode);
     }
 
@@ -927,7 +927,7 @@ void LimitedNodeList::removeSilentNodes() {
         node->getMutex().unlock();
     });
 
-    foreach(const SharedNodePointer& killedNode, killedNodes) {
+    for(const auto& killedNode : killedNodes) {
         auto now = usecTimestampNow();
         qCDebug(networking_ice) << "Removing silent node" << *killedNode << "\n"
             << "    Now: " << now << "\n"
@@ -1377,9 +1377,10 @@ bool LimitedNodeList::getLocalServerPortFromSharedMemory(const QString key, quin
 }
 
 void LimitedNodeList::flagTimeForConnectionStep(ConnectionStep connectionStep) {
+    quint64 timestamp = usecTimestampNow();
     QMetaObject::invokeMethod(this, "flagTimeForConnectionStep",
                               Q_ARG(ConnectionStep, connectionStep),
-                              Q_ARG(quint64, usecTimestampNow()));
+                              Q_ARG(quint64, timestamp));
 }
 
 void LimitedNodeList::flagTimeForConnectionStep(ConnectionStep connectionStep, quint64 timestamp) {

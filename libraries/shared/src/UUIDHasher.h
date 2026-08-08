@@ -22,9 +22,11 @@ public:
     size_t operator()(const QUuid& uuid) const { return qHash(uuid); }
 };
 
+#ifndef STD_HASH_QUUID_DEFINED
 template <>
 struct std::hash<QUuid> {
     size_t operator()(const QUuid& uuid) const { return qHash(uuid); }
 };
+#endif
 
 #endif  // hifi_UUIDHasher_h

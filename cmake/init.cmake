@@ -54,7 +54,11 @@ if (UNIX)
   # and crashes on exit, and perhaps loss of global state on plugin loads.
   #
   # This will need to be looked at closely before Linux can have a static build.
-  set(BUILD_SHARED_LIBS ON)
+  #
+  # Opt-in to a static build by passing -DBUILD_SHARED_LIBS=OFF.
+  if (NOT DEFINED BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON)
+  endif ()
 endif ()
 
 find_package(Python3 REQUIRED)

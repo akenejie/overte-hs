@@ -4,7 +4,11 @@
 
 set(TARGET_NAME assignment-client)
 
-setup_hifi_project(Core Gui Network Quick WebSockets)
+if (OVERTE_HEADLESS)
+  setup_hifi_project(Core Network)
+else()
+  setup_hifi_project(Core Gui Network Quick WebSockets)
+endif()
 
 # Fix up the rpath so macdeployqt works
 if (APPLE)
@@ -15,12 +19,27 @@ setup_memory_debugger()
 setup_thread_debugger()
 
 # link in the shared libraries
-link_hifi_libraries(
-  audio avatars octree gpu graphics shaders model-serializers hfm entities
-  networking animation recording shared script-engine embedded-webserver
-  controllers physics plugins midi image
-  material-networking model-networking ktx shaders
-)
+if (OVERTE_HEADLESS)
+  link_hifi_libraries(
+    networking shared physics octree avatars entities
+    audio animation recording
+    plugins
+    script-engine
+    image
+    graphics
+    model-networking model-serializers
+    gpu ktx shaders render material-networking procedural
+    hfm model-baker
+    workload task
+  )
+else()
+  link_hifi_libraries(
+    audio avatars octree gpu graphics shaders model-serializers hfm entities
+    networking animation recording shared script-engine embedded-webserver
+    controllers physics plugins midi image
+    material-networking model-networking ktx shaders
+  )
+endif()
 include_hifi_library_headers(procedural)
 include_hifi_library_headers(entities)
 

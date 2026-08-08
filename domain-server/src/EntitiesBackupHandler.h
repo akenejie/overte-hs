@@ -12,6 +12,8 @@
 #ifndef hifi_EntitiesBackupHandler_h
 #define hifi_EntitiesBackupHandler_h
 
+#ifndef OVERTE_HEADLESS
+
 #include "BackupHandler.h"
 
 class EntitiesBackupHandler : public BackupHandlerInterface {
@@ -43,5 +45,6 @@ private:
     QString _entitiesFilePath;
     QString _entitiesReplacementFilePath;
 };
+#endif // OVERTE_HEADLESS
 
 #endif /* hifi_EntitiesBackupHandler_h */

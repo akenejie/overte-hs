@@ -12,8 +12,11 @@
 #include "TextureCache.h"
 
 #include <mutex>
+#include <thread>
 
+#if !defined(OVERTE_HEADLESS)
 #include <QtConcurrent/QtConcurrentRun>
+#endif
 
 #include <QCryptographicHash>
 #include <QImageReader>
@@ -54,6 +57,20 @@
 #include <TextureMeta.h>
 
 #include <OwningBuffer.h>
+
+namespace {
+#if defined(OVERTE_HEADLESS)
+template <typename Functor>
+void dispatchToBackgroundThread(QThreadPool*, Functor&& functor) {
+    std::thread(std::forward<Functor>(functor)).detach();
+}
+#else
+template <typename Functor>
+void dispatchToBackgroundThread(QThreadPool* pool, Functor&& functor) {
+    QtConcurrent::run(pool, std::forward<Functor>(functor));
+}
+#endif
+}
 
 Q_LOGGING_CATEGORY(trace_resource_parse_image, "trace.resource.parse.image")
 Q_LOGGING_CATEGORY(trace_resource_parse_image_raw, "trace.resource.parse.image.raw")
@@ -539,7 +556,7 @@ void NetworkTexture::makeRequest() {
 
     if (isLocalUrl(_activeUrl)) {
         auto self = _self;
-        QtConcurrent::run(QThreadPool::globalInstance(), [self] {
+        dispatchToBackgroundThread(QThreadPool::globalInstance(), [self] {
             auto resource = self.lock();
             if (!resource) {
                 return;
@@ -834,7 +851,7 @@ void NetworkTexture::ktxMipRequestFinished() {
             auto mipLevel = _ktxMipLevelRangeInFlight.first;
             auto texture = _textureSource->getGPUTexture();
             DependencyManager::get<StatTracker>()->incrementStat("PendingProcessing");
-            QtConcurrent::run(QThreadPool::globalInstance(), [self, data, mipLevel, url, texture] {
+            dispatchToBackgroundThread(QThreadPool::globalInstance(), [self, data, mipLevel, url, texture] {
                 PROFILE_RANGE_EX(resource_parse_image, "NetworkTexture - Processing Mip Data", 0xffff0000, 0, { { "url", url.toString() } });
                 DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
                 CounterStat counter("Processing");
@@ -902,7 +919,7 @@ void NetworkTexture::handleFinishedInitialLoad() {
     auto self = _self;
     auto url = _url;
     DependencyManager::get<StatTracker>()->incrementStat("PendingProcessing");
-    QtConcurrent::run(QThreadPool::globalInstance(), [self, ktxHeaderData, ktxHighMipData, url] {
+    dispatchToBackgroundThread(QThreadPool::globalInstance(), [self, ktxHeaderData, ktxHighMipData, url] {
         PROFILE_RANGE_EX(resource_parse_image, "NetworkTexture - Processing Initial Data", 0xffff0000, 0, { { "url", url.toString() } });
         DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
         CounterStat counter("Processing");

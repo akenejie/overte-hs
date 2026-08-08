@@ -9,9 +9,11 @@ class Overte(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {
         "qt_source": ["system", "aqt", "source"],
+        "headless": [True, False],
     }
     default_options = {
         "qt_source": "system",
+        "headless": False,
         "sdl*:alsa": "False",
         "sdl*:pulse": "False",
         "sdl*:wayland": "False",
@@ -53,6 +55,21 @@ class Overte(ConanFile):
         self.folders.generators = os.path.join(self.folders.build, "generators")
 
     def requirements(self):
+        self.requires("nlohmann_json/3.11.2")
+        self.requires("glm/0.9.9.5", force=True)
+        self.requires("jsoncpp/1.9.6", force=True)
+        self.requires("zlib/1.3.1")
+
+        if self.options.headless:
+            # Minimal deps for headless server - skip Qt, SDL, WebRTC, VR, rendering.
+            # oneTBB is built statically from source (conan's recipe is shared-library only)
+            # and provided via CMAKE_PREFIX_PATH; see the static build docs.
+            self.requires("bullet3/3.25")
+            self.requires("openssl/3.5.7", force=True)
+            return
+
+        self.requires("onetbb/2021.10.0")
+
         self.requires("artery-font-format/1.0.1") # FIXME: update to 1.1
         self.requires("bullet3/3.25")
         self.requires("cgltf/1.14@overte/stable")
@@ -66,9 +83,7 @@ class Overte(ConanFile):
         self.requires("glslang/1.4.350.0")
         self.requires("liblo/0.35@overte/stable") # For hifiOSC
         self.requires("libnode/22.22.3@overte/stable#12c9d377b2df64060e312a93bf14592f")
-        self.requires("nlohmann_json/3.11.2")
         self.requires("nvidia-texture-tools/2023.01@overte/stable#bb4a28e5438f69332299cc23b770fc07")
-        self.requires("onetbb/2021.10.0")
         self.requires("openexr/3.1.9")
         self.requires("openvr/2.15.6@overte/stable")
         self.requires("openxr/1.1.46@overte/stable")
@@ -82,25 +97,16 @@ class Overte(ConanFile):
         self.requires("v-hacd/4.1.0")
         self.requires("vulkan-memory-allocator/3.0.1")
         self.requires("webrtc-audio-processing/2.1@overte/stable")
-        self.requires("zlib/1.3.1")
-        self.requires("glm/0.9.9.5", force=True) # FIXME: update to version 1.0.1
-        self.requires("jsoncpp/1.9.6", force=True)
         openssl = "openssl/1.1.1q"
 
         if self.options.qt_source == "system":
             self.requires("qt/5.15.2@overte/system", force=True)
             if self.settings.os == "Linux":
-                openssl = "openssl/system@overte/stable#24c4df65c52791c4955f7d47d9faef0d"
+                openssl = "openssl/system@anotherfoxguy/stable"
         elif self.options.qt_source == "aqt":
             self.requires("qt/5.15.2@overte/aqt", force=True)
         else:
-            if self.settings.os == "Linux":
-                # Use system OpenSSL to work around OpenSSL being missing from libnode's rpath and this cascading down to Interface.
-                openssl = "openssl/system@overte/stable#24c4df65c52791c4955f7d47d9faef0d"
-                self.requires("fcitx5-qt/5.1.13@overte/stable#41b7ae9082f32e1ad83fd8a43a2c8460")
-            self.requires("qt/5.15.18@overte/experimental#3a9079f3023351a7319be352cc6f4665", force=True)
-            # Replace Conan Center's glib package with our own duplicate to avoid their outdated binary cache. https://github.com/conan-io/conan-center-index/issues/17876
-            self.requires("glib/2.78.3@overte/conancenter", override=True)
+            self.requires("qt/5.15.18-2026.01.04@overte/stable#4fc772a2dbcd84731eb6ff9904e6e358", force=True)
 
         if self.settings.os == "Windows":
             self.requires("neuron/12.2@overte/prebuild")
@@ -185,26 +191,27 @@ class Overte(ConanFile):
             for f in dep.cpp_info.libdirs:
                 self.cp_libs(f)
 
-        toolspath = """
-        set(GLSLANG_DIR "%s")
-        set(SCRIBE_DIR "%s/tools")
-        set(SPIRV_CROSS_DIR "%s")
-        set(SPIRV_TOOLS_DIR "%s")
-        """ % (
-            ";".join(self.dependencies["glslang"].cpp_info.bindirs).replace("\\", "/"),
-            self.dependencies["scribe"].package_folder.replace("\\", "/"),
-            ";".join(self.dependencies["spirv-cross"].cpp_info.bindirs).replace(
-                "\\", "/"
-            ),
-            ";".join(self.dependencies["spirv-tools"].cpp_info.bindirs).replace(
-                "\\", "/"
-            ),
-        )
-        save(
-            self,
-            os.path.join(self.build_folder, "cmake", "ConanToolsDirs.cmake"),
-            toolspath,
-        )
+        if not self.options.headless and "glslang" in self.dependencies:
+            toolspath = """
+            set(GLSLANG_DIR "%s")
+            set(SCRIBE_DIR "%s/tools")
+            set(SPIRV_CROSS_DIR "%s")
+            set(SPIRV_TOOLS_DIR "%s")
+            """ % (
+                ";".join(self.dependencies["glslang"].cpp_info.bindirs).replace("\\", "/"),
+                self.dependencies["scribe"].package_folder.replace("\\", "/"),
+                ";".join(self.dependencies["spirv-cross"].cpp_info.bindirs).replace(
+                    "\\", "/"
+                ),
+                ";".join(self.dependencies["spirv-tools"].cpp_info.bindirs).replace(
+                    "\\", "/"
+                ),
+            )
+            save(
+                self,
+                os.path.join(self.build_folder, "cmake", "ConanToolsDirs.cmake"),
+                toolspath,
+            )
 
     def cp_libs(self, src):
         bindir = os.path.join(

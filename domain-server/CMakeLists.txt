@@ -11,7 +11,16 @@ else ()
 endif ()
 
 # setup the project and link required Qt modules
-setup_hifi_project(Network)
+if (OVERTE_HEADLESS)
+    setup_hifi_project(Network)
+    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/compat")
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/AssetsBackupHandler.h"
+    PROPERTIES SKIP_AUTOMOC ON
+    )
+else()
+  setup_hifi_project(Network)
+endif()
 
 # Fix up the rpath so macdeployqt works
 if (APPLE)
@@ -22,19 +31,25 @@ setup_memory_debugger()
 setup_thread_debugger()
 
 # TODO: find a solution that will handle web file changes in resources on windows without a re-build.
-# Currently the resources are only copied on post-build. If one is changed but the domain-server is not, they will
-# not be re-copied. This is worked-around on OS X/UNIX by using a symlink.
 symlink_or_copy_directory_beside_target(${_SHOULD_SYMLINK_RESOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/resources" "resources")
 
 # link the shared hifi libraries
 include_hifi_library_headers(gpu)
 include_hifi_library_headers(graphics)
 include_hifi_library_headers(script-engine)
-link_hifi_libraries(embedded-webserver networking shared avatars octree)
+
+if (OVERTE_HEADLESS)
+  link_hifi_libraries(networking shared avatars octree)
+else()
+  link_hifi_libraries(embedded-webserver networking shared avatars octree)
+endif()
 
 target_zlib()
 target_quazip()
-target_openssl()
+
+if (NOT OVERTE_HEADLESS)
+  target_openssl()
+endif()
 
 add_crashpad()
 target_breakpad()

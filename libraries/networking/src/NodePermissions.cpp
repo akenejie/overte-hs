@@ -55,7 +55,7 @@ NodePermissions::NodePermissions(QMap<QString, QVariant> perms) {
 }
 
 QVariant NodePermissions::toVariant(QHash<QUuid, GroupRank> groupRanks) {
-    QMap<QString, QVariant> values;
+    QVariantMap values;
     values["permissions_id"] = _id;
     if (_groupIDSet) {
         values["group_id"] = _groupID;

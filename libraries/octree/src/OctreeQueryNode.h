@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-#include <qqueue.h>
+#include <QQueue>
 
 #include "OctreeConstants.h"
 #include "OctreeElementBag.h"

@@ -7,6 +7,19 @@
 #  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 # 
 macro(TARGET_GLAD)
+    if (OVERTE_HEADLESS)
+        # Create a stub interface library for headless builds
+        if (NOT TARGET glad::glad)
+            add_library(glad INTERFACE)
+            add_library(glad::glad ALIAS glad)
+            target_include_directories(glad INTERFACE "${CMAKE_SOURCE_DIR}/compat")
+        endif()
+        if (NOT TARGET OpenGL::GL)
+            add_library(OpenGL INTERFACE)
+            add_library(OpenGL::GL ALIAS OpenGL)
+        endif()
+        return()
+    endif()
     if (ANDROID)
         include(SelectLibraryConfigurations)
         set(INSTALL_DIR ${HIFI_ANDROID_PRECOMPILED}/glad)

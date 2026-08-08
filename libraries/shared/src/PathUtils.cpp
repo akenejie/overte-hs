@@ -244,7 +244,7 @@ int PathUtils::removeTemporaryApplicationDirs(QString appName) {
 
 QString fileNameWithoutExtension(const QString& fileName, const QVector<QString> possibleExtensions) {
     QString fileNameLowered = fileName.toLower();
-    foreach (const QString possibleExtension, possibleExtensions) {
+    for (const QString& possibleExtension : possibleExtensions) {
         if (fileNameLowered.endsWith(possibleExtension.toLower())) {
             return fileName.left(fileName.count() - possibleExtension.count() - 1);
         }
@@ -256,7 +256,7 @@ QString findMostRecentFileExtension(const QString& originalFileName, QVector<QSt
     QString sansExt = fileNameWithoutExtension(originalFileName, possibleExtensions);
     QString newestFileName = originalFileName;
     QDateTime newestTime = QDateTime::fromMSecsSinceEpoch(0);
-    foreach (QString possibleExtension, possibleExtensions) {
+    for (const QString& possibleExtension : possibleExtensions) {
         QString fileName = sansExt + "." + possibleExtension;
         QFileInfo fileInfo(fileName);
         if (fileInfo.exists() && fileInfo.lastModified() > newestTime) {

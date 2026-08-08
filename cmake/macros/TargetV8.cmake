@@ -7,6 +7,9 @@
 #  SPDX-License-Identifier: Apache-2.0
 #
 macro(TARGET_V8)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if(OVERTE_USE_SYSTEM_LIBS)
         # NOTE: this is configured for NixOS specifically
         find_package(PkgConfig REQUIRED)

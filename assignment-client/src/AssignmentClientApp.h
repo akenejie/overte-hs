@@ -14,7 +14,7 @@
 #define hifi_AssignmentClientApp_h
 
 
-#include <QApplication>
+#include <QCoreApplication>
 
 const QString ASSIGNMENT_TYPE_OVERRIDE_OPTION = "t";
 const QString ASSIGNMENT_POOL_OPTION = "pool";

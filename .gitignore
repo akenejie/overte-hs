@@ -12,6 +12,9 @@ CMakeFiles/
 CMakeScripts/
 cmake_install.cmake
 /build*/
+/deps/
+/dist/
+/rust-udp/target/
 cmake-build-minsizerelease-visual-studio/
 cmake-build-release-visual-studio/
 cmake-build-relwithdebinfo-visual-studio/

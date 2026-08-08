@@ -22,8 +22,10 @@
 #include <QtCore/QObject>
 #include <QtCore/QStringList>
 #include <QtCore/QSharedPointer>
+#if !defined(OVERTE_HEADLESS)
 #include <QtQml/QJSValue>
 #include <QtQml/QJSValueList>
+#endif
 #include <QtCore/QSharedPointer>
 
 #include <DependencyManager.h>

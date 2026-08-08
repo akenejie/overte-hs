@@ -147,7 +147,7 @@ QString ReceivedMessage::readString() {
 }
 
 QByteArray ReceivedMessage::readWithoutCopy(qint64 size) {
-    QByteArray data { QByteArray::fromRawData(_data.constData() + _position, size) };
+    QByteArray data = QByteArray::fromRawData(_data.constData() + _position, size);
     _position += size;
     return data;
 }

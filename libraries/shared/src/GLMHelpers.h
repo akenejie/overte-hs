@@ -42,8 +42,13 @@ using glm::quat;
 #endif
 
 #include <QtCore/QByteArray>
+#include <QtCore/QPoint>
+#include <QtCore/QRect>
+#include <QtCore/QSize>
+#ifndef OVERTE_HEADLESS
 #include <QtGui/QMatrix4x4>
 #include <QtGui/QColor>
+#endif
 
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
@@ -178,12 +183,16 @@ uvec2 toGlm(const QSize& size);
 ivec2 toGlm(const QPoint& pt);
 vec2 toGlm(const QPointF& pt);
 vec3 toGlm(const glm::u8vec3& color);
+#ifndef OVERTE_HEADLESS
 vec4 toGlm(const QColor& color);
+#endif
 ivec4 toGlm(const QRect& rect);
 vec4 toGlm(const glm::u8vec3& color, float alpha);
 
 QSize fromGlm(const glm::ivec2 & v);
+#ifndef OVERTE_HEADLESS
 QMatrix4x4 fromGlm(const glm::mat4 & m);
+#endif
 
 QRectF glmToRect(const glm::vec2 & pos, const glm::vec2 & size);
 
@@ -338,7 +347,7 @@ inline uint32_t glm_packSnorm3x10_1x2(vec4 const& v) {
     Result.data.z = _mm_cvtsi128_si32(_mm_shuffle_epi32(vpack, _MM_SHUFFLE(2,2,2,2)));
     Result.data.w = _mm_cvtsi128_si32(_mm_shuffle_epi32(vpack, _MM_SHUFFLE(3,3,3,3)));
 #else
-    ivec4 const Pack(round(clamp(v, -1.0f, 1.0f) * vec4(511.f, 511.f, 511.f, 1.f)));
+    glm::ivec4 const Pack(round(clamp(v, -1.0f, 1.0f) * vec4(511.f, 511.f, 511.f, 1.f)));
 
     Result.data.x = Pack.x;
     Result.data.y = Pack.y;

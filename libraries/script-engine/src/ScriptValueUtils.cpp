@@ -184,6 +184,21 @@ bool vec2FromScriptValue(const ScriptValue& object, glm::vec2& vec2) {
 }
 
 #ifndef CONVERSIONS_OPTIMIZED_FOR_V8
+ScriptValue qBytearrayToScriptValue(ScriptEngine* engine, const QByteArray &qByteArray) {
+    return engine->newArrayBuffer(qByteArray);
+}
+
+bool qBytearrayFromScriptValue(const ScriptValue& object, QByteArray &qByteArray) {
+    QVariant variant = object.toVariant();
+    if (variant.canConvert<QByteArray>()) {
+        qByteArray = variant.toByteArray();
+        return true;
+    }
+    return false;
+}
+#endif
+
+#ifndef CONVERSIONS_OPTIMIZED_FOR_V8
 ScriptValue vec3ToScriptValue(ScriptEngine* engine, const glm::vec3& vec3) {
     auto prototype = engine->globalObject().property("__hifi_vec3__");
     if (!prototype.hasProperty("defined") || !prototype.property("defined").toBool()) {

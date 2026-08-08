@@ -19,7 +19,9 @@
 #include "CalculateBlendshapeNormalsTask.h"
 #include "CalculateBlendshapeTangentsTask.h"
 #include "PrepareJointsTask.h"
+#if !defined(OVERTE_HEADLESS)
 #include "BuildDracoMeshTask.h"
+#endif
 #include "ParseFlowDataTask.h"
 
 namespace baker {
@@ -172,11 +174,18 @@ namespace baker {
             // TODO: Tangent support (Needs changes to FBXSerializer_Mesh as well)
             // NOTE: Due to an unresolved linker error, BuildDracoMeshTask is not functional on Android
             // TODO: Figure out why BuildDracoMeshTask.cpp won't link with draco on Android
+#if !defined(OVERTE_HEADLESS)
             const auto buildDracoMeshInputs = BuildDracoMeshTask::Input(meshesIn, normalsPerMesh, tangentsPerMesh).asVarying();
             const auto buildDracoMeshOutputs = model.addJob<BuildDracoMeshTask>("BuildDracoMesh", buildDracoMeshInputs);
             const auto dracoMeshes = buildDracoMeshOutputs.getN<BuildDracoMeshTask::Output>(0);
             const auto dracoErrors = buildDracoMeshOutputs.getN<BuildDracoMeshTask::Output>(1);
             const auto materialList = buildDracoMeshOutputs.getN<BuildDracoMeshTask::Output>(2);
+#else
+            // Draco is not available in the headless build; emit no draco data.
+            const auto dracoMeshes = std::vector<hifi::ByteArray>();
+            const auto dracoErrors = std::vector<bool>();
+            const auto materialList = std::vector<std::vector<hifi::ByteArray>>();
+#endif
 
             // Parse flow data
             const auto flowData = model.addJob<ParseFlowDataTask>("ParseFlowData", mapping);

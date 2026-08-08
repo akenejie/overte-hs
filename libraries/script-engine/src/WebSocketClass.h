@@ -18,7 +18,9 @@
 #define hifi_WebSocketClass_h
 
 #include <QObject>
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include <QWebSocket>
+#endif
 
 #include "ScriptValue.h"
 
@@ -86,6 +88,11 @@ class ScriptEngine;
  * };
  */
 /// Provides the <code><a href="https://apidocs.overte.org/WebSocket.html">WebSocket</a></code> scripting interface
+#if defined(OVERTE_NO_QTWEBSOCKET)
+class ScriptContext;
+class ScriptEngine;
+
+#else
 class WebSocketClass : public QObject {
     Q_OBJECT
         Q_PROPERTY(QString binaryType READ getBinaryType WRITE setBinaryType)
@@ -260,6 +267,8 @@ bool webSocketFromScriptValue(const ScriptValue& object, WebSocketClass*& out);
 
 ScriptValue wscReadyStateToScriptValue(ScriptEngine* engine, const WebSocketClass::ReadyState& readyState);
 bool wscReadyStateFromScriptValue(const ScriptValue& object, WebSocketClass::ReadyState& readyState);
+
+#endif // OVERTE_NO_QTWEBSOCKET
 
 #endif // hifi_WebSocketClass_h
 

@@ -44,7 +44,9 @@ AssignmentClientMonitor::AssignmentClientMonitor(const unsigned int numAssignmen
                                                  quint16 listenPort, quint16 childMinListenPort, QString assignmentServerHostname,
                                                  quint16 assignmentServerPort, quint16 httpStatusServerPort, QString logDirectory,
                                                  bool disableDomainPortAutoDiscovery, QString logOptions) :
+#ifndef OVERTE_HEADLESS
     _httpManager(QHostAddress::LocalHost, httpStatusServerPort, "", this),
+#endif
     _numAssignmentClientForks(numAssignmentClientForks),
     _minAssignmentClientForks(minAssignmentClientForks),
     _maxAssignmentClientForks(maxAssignmentClientForks),
@@ -384,6 +386,7 @@ void AssignmentClientMonitor::handleChildStatusPacket(QSharedPointer<ReceivedMes
     }
 }
 
+#ifndef OVERTE_HEADLESS
 bool AssignmentClientMonitor::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
     if (url.path() == "/status") {
         QByteArray response;
@@ -412,6 +415,7 @@ bool AssignmentClientMonitor::handleHTTPRequest(HTTPConnection* connection, cons
 
     return true;
 }
+#endif // OVERTE_HEADLESS
 
 void AssignmentClientMonitor::adjustOSResources(unsigned int numForks) const
 {

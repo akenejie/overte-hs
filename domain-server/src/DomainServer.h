@@ -23,22 +23,31 @@
 #include <QtCore/QUrl>
 #include <QHostAddress>
 #include <QAbstractNativeEventFilter>
+#include <QTemporaryFile>
 
 #include <Assignment.h>
-#include <HTTPSConnection.h>
 #include <LimitedNodeList.h>
+#ifndef OVERTE_HEADLESS
+#include <HTTPSConnection.h>
 #include <shared/WebRTC.h>
 #include <webrtc/WebRTCSignalingServer.h>
+#endif
 
+#ifndef OVERTE_HEADLESS
 #include "AssetsBackupHandler.h"
+#endif
 #include "DomainGatekeeper.h"
 #include "DomainMetadata.h"
 #include "DomainServerSettingsManager.h"
+#ifndef OVERTE_HEADLESS
 #include "DomainServerWebSessionData.h"
 #include "DomainContentBackupManager.h"
+#endif
 
 #include "PendingAssignedNodeData.h"
+#ifndef OVERTE_HEADLESS
 #include "DomainServerExporter.h"
+#endif
 
 #include <QLoggingCategory>
 
@@ -46,7 +55,7 @@ Q_DECLARE_LOGGING_CATEGORY(domain_server)
 Q_DECLARE_LOGGING_CATEGORY(domain_server_ice)
 Q_DECLARE_LOGGING_CATEGORY(domain_server_auth)
 
-typedef QSharedPointer<Assignment> SharedAssignmentPointer;
+typedef QSharedPointer<Assignment> DomainAssignmentPointer;
 
 using Subnet = QPair<QHostAddress, int>;
 using SubnetList = std::vector<Subnet>;
@@ -58,7 +67,11 @@ enum ReplicationServerDirection {
     Downstream
 };
 
-class DomainServer : public QCoreApplication, public HTTPSRequestHandler {
+class DomainServer : public QCoreApplication
+#ifndef OVERTE_HEADLESS
+    , public HTTPSRequestHandler
+#endif
+{
     Q_OBJECT
 public:
     DomainServer(int argc, char* argv[]);
@@ -74,8 +87,10 @@ public:
 
     static int const EXIT_CODE_REBOOT;
 
+#ifndef OVERTE_HEADLESS
     bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler = false) override;
     bool handleHTTPSRequest(HTTPSConnection* connection, const QUrl& url, bool skipSubHandler = false) override;
+#endif
 
     static const QString REPLACEMENT_FILE_EXTENSION;
 
@@ -101,9 +116,11 @@ private slots:
     void processICEServerHeartbeatACK(QSharedPointer<ReceivedMessage> message);
     void processAvatarZonePresencePacket(QSharedPointer<ReceivedMessage> packet);
 
+#ifndef OVERTE_HEADLESS
     void handleDomainContentReplacementFromURLRequest(QSharedPointer<ReceivedMessage> message);
     void handleOctreeFileReplacementRequest(QSharedPointer<ReceivedMessage> message);
     bool handleOctreeFileReplacement(QByteArray octreeFile, QString sourceFilename, QString name, QString username);
+#endif
 
     void processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message);
     void processOctreeDataPersistMessage(QSharedPointer<ReceivedMessage> message);
@@ -114,8 +131,10 @@ private slots:
     void nodePingMonitor();
 
     void handleConnectedNode(SharedNodePointer newNode, quint64 requestReceiveTime);
+#ifndef OVERTE_HEADLESS
     void handleTempDomainSuccess(QNetworkReply* requestReply);
     void handleTempDomainError(QNetworkReply* requestReply);
+#endif
 
     void handleMetaverseHeartbeatError(QNetworkReply* requestReply);
 
@@ -134,11 +153,15 @@ private slots:
     void updateDownstreamNodes();
     void updateUpstreamNodes();
 
+#ifndef OVERTE_HEADLESS
     void initializeExporter();
     void initializeMetadataExporter();
+#endif
 
+#ifndef OVERTE_HEADLESS
     void tokenGrantFinished();
     void profileRequestFinished();
+#endif
 
 #if defined(WEBRTC_DATA_CHANNELS)
     void forwardAssignmentClientSignalingMessageToUserClient(QSharedPointer<ReceivedMessage> message);
@@ -168,10 +191,14 @@ private:
     void maybeHandleReplacementEntityFile();
 
     void setupNodeListAndAssignments();
+#ifndef OVERTE_HEADLESS
     bool optionallySetupOAuth();
     bool optionallyReadX509KeyAndCertificate();
+#endif
 
+#ifndef OVERTE_HEADLESS
     void getTemporaryName(bool force = false);
+#endif
 
     static bool isPacketVerified(const udt::Packet& packet);
 
@@ -202,11 +229,12 @@ private:
     void populateDefaultStaticAssignmentsExcludingTypes(const QSet<Assignment::Type>& excludedTypes);
     void populateStaticScriptedAssignmentsFromSettings();
 
-    SharedAssignmentPointer dequeueMatchingAssignment(const QUuid& checkInUUID, NodeType_t nodeType);
-    SharedAssignmentPointer deployableAssignmentForRequest(const Assignment& requestAssignment);
-    void refreshStaticAssignmentAndAddToQueue(SharedAssignmentPointer& assignment);
+    DomainAssignmentPointer dequeueMatchingAssignment(const QUuid& checkInUUID, NodeType_t nodeType);
+    DomainAssignmentPointer deployableAssignmentForRequest(const Assignment& requestAssignment);
+    void refreshStaticAssignmentAndAddToQueue(DomainAssignmentPointer& assignment);
     void addStaticAssignmentsToQueue();
 
+#ifndef OVERTE_HEADLESS
     QUrl oauthRedirectURL();
     QUrl oauthAuthorizationURL(const QUuid& stateUUID = QUuid::createUuid());
 
@@ -214,6 +242,7 @@ private:
 
     QNetworkReply* profileRequestGivenTokenReply(QNetworkReply* tokenReply);
     Headers setupCookieHeadersFromProfileReply(QNetworkReply* profileReply);
+#endif
 
     QJsonObject jsonForSocket(const SockAddr& socket);
     QJsonObject jsonObjectForNode(const SharedNodePointer& node);
@@ -226,6 +255,7 @@ private:
 
     void updateReplicationNodes(ReplicationServerDirection direction);
 
+#ifndef OVERTE_HEADLESS
     HTTPSConnection* connectionFromReplyWithState(QNetworkReply* reply);
 
     bool processPendingContent(HTTPConnection* connection, QString itemName, QString filename, QByteArray dataChunk);
@@ -237,6 +267,7 @@ private:
                                     std::initializer_list<QString> requiredData = { },
                                     std::initializer_list<QString> optionalData = { },
                                     bool requireAccessToken = true);
+#endif
 
 #if defined(WEBRTC_DATA_CHANNELS)
     void setUpWebRTCSignalingServer();
@@ -244,23 +275,29 @@ private:
     void sendWebRTCSignalingMessageToAssignmentClient(const QJsonObject& json);
 #endif
 
+#ifndef OVERTE_HEADLESS
     QString operationToString(const QNetworkAccessManager::Operation &op);
+#endif
 
     SubnetList _acSubnetAllowlist;
 
     std::vector<QString> _replicatedUsernames;
 
     DomainGatekeeper _gatekeeper;
+#ifndef OVERTE_HEADLESS
     DomainServerExporter _exporter;
+#endif
 
+#ifndef OVERTE_HEADLESS
     HTTPManager _httpManager;
     HTTPManager* _httpExporterManager { nullptr };
     HTTPManager* _httpMetadataExporterManager { nullptr };
 
     std::unique_ptr<HTTPSManager> _httpsManager;
+#endif
 
-    QHash<QUuid, SharedAssignmentPointer> _allAssignments;
-    QQueue<SharedAssignmentPointer> _unfulfilledAssignments;
+    QHash<QUuid, DomainAssignmentPointer> _allAssignments;
+    QQueue<DomainAssignmentPointer> _unfulfilledAssignments;
 
     bool _isUsingDTLS { false };
 
@@ -272,8 +309,10 @@ private:
 
     std::unordered_map<QUuid, QByteArray> _ephemeralACScripts;
 
+#ifndef OVERTE_HEADLESS
     QSet<QUuid> _webAuthenticationStateSet;
     QHash<QUuid, DomainServerWebSessionData> _cookieSessionHash;
+#endif
 
     QString _automaticNetworkingSetting;
 
@@ -309,14 +348,19 @@ private:
     static QString _userConfigFilename;
     static int _parentPID;
     static bool _forceCrashReporting;
+    static int _customLocalPort; // -1 = not specified; the port is CLI-only (--port)
 
 
     bool _sendICEServerAddressToMetaverseAPIInProgress { false };
     bool _sendICEServerAddressToMetaverseAPIRedo { false };
 
+#ifndef OVERTE_HEADLESS
     std::unique_ptr<DomainContentBackupManager> _contentManager { nullptr };
+#endif
 
+#ifndef OVERTE_HEADLESS
     QHash<QUuid, QPointer<HTTPSConnection>> _pendingOAuthConnections;
+#endif
 
     std::unordered_map<int, QByteArray> _pendingUploadedContents;
     std::unordered_map<int, std::unique_ptr<QTemporaryFile>> _pendingContentFiles;

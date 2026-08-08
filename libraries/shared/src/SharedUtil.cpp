@@ -190,7 +190,7 @@ void outputBits(unsigned char byte, QDebug* continuedDebug) {
     qts << qSetPadChar('0');
 
     if (isalnum(byte)) {
-        qts << " (" << QString(byte) << ")   : ";
+        qts << " (" << QString(QChar((char)byte)) << ")   : ";
     } else {
         qts << " (0x" << Qt::hex << qSetFieldWidth(2) << byte << qSetFieldWidth(0) << "): ";
     }
@@ -763,13 +763,13 @@ bool similarStrings(const QString& stringA, const QString& stringB) {
     QStringList aWords = stringA.split(" ");
     QStringList bWords = stringB.split(" ");
     float aWordsInB = 0.0f;
-    foreach(QString aWord, aWords) {
+    for (const auto& aWord : aWords) {
         if (bWords.contains(aWord)) {
             aWordsInB += 1.0f;
         }
     }
     float bWordsInA = 0.0f;
-    foreach(QString bWord, bWords) {
+    for (const auto& bWord : bWords) {
         if (aWords.contains(bWord)) {
             bWordsInA += 1.0f;
         }

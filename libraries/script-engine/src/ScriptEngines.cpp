@@ -21,7 +21,10 @@
 #include <UserActivityLogger.h>
 #include <PathUtils.h>
 #include <shared/FileUtils.h>
+#include <thread>
+#if !defined(OVERTE_HEADLESS)
 #include <QtConcurrent/QtConcurrent>
+#endif
 
 #include "ScriptCache.h"
 #include "ScriptEngine.h"
@@ -466,7 +469,7 @@ QStringList ScriptEngines::getRunningScripts() {
 }
 
 void ScriptEngines::stopAllScripts(bool restart) {
-    QtConcurrent::run([this, restart] {
+    auto stopAllScriptsBody = [this, restart] {
         QHash<QUrl, ScriptManagerPointer> scriptManagersHashCopy;
 
         {
@@ -508,7 +511,12 @@ void ScriptEngines::stopAllScripts(bool restart) {
             QTimer::singleShot(RELOAD_ALL_SCRIPTS_TIMEOUT, this, [&] { _isReloading = false; });
             emit scriptsReloading();
         }
-    });
+    };
+#if defined(OVERTE_HEADLESS)
+    std::thread(std::move(stopAllScriptsBody)).detach();
+#else
+    QtConcurrent::run(std::move(stopAllScriptsBody));
+#endif
 }
 
 bool ScriptEngines::stopScript(const QString& rawScriptURL, bool restart) {

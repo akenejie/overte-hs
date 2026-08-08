@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 set(TARGET_NAME entities)
+
+
 generate_entity_properties()
 setup_hifi_library(Network)
 target_include_directories(${TARGET_NAME} PRIVATE "${OPENSSL_INCLUDE_DIR}")

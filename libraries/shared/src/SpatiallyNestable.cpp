@@ -1034,7 +1034,7 @@ void SpatiallyNestable::setLocalSNScale(const glm::vec3& scale) {
 QList<SpatiallyNestablePointer> SpatiallyNestable::getChildren() const {
     QList<SpatiallyNestablePointer> children;
     _childrenLock.withReadLock([&] {
-        foreach(SpatiallyNestableWeakPointer childWP, _children.values()) {
+        for (const auto& childWP : _children.values()) {
             SpatiallyNestablePointer child = childWP.lock();
             // An object can set MyAvatar to be its parent using two IDs: the session ID and the special AVATAR_SELF_ID
             // Because we only recognize an object as having one ID, we need to check for the second possible ID here.
@@ -1478,7 +1478,7 @@ void SpatiallyNestable::removeGrab(GrabPointer grab) {
 bool SpatiallyNestable::hasGrabs() {
     bool result { false };
     _grabsLock.withReadLock([&] {
-        foreach (const GrabPointer &grab, _grabs) {
+        for (const auto& grab : _grabs) {
             if (grab && !grab->getReleased()) {
                 result = true;
                 break;
@@ -1493,7 +1493,7 @@ QUuid SpatiallyNestable::getEditSenderID() {
     QUuid editSenderID;
     bool editSenderIDSet { false };
     _grabsLock.withReadLock([&] {
-        foreach (const GrabPointer &grab, _grabs) {
+        for (const auto& grab : _grabs) {
             QUuid ownerID = grab->getOwnerID();
             if (!editSenderIDSet) {
                 editSenderID = ownerID;

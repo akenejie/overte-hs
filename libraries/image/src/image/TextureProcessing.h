@@ -18,7 +18,9 @@
 #include <gpu/Texture.h>
 
 #include "Image.h"
+#if defined(NVTT_API)
 #include <nvtt/nvtt.h>
+#endif
 
 namespace image {
 

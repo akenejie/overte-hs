@@ -23,13 +23,13 @@ QHostAddress getGuessedLocalAddress() {
     QHostAddress localAddress;
     QHostAddress linkLocalAddress;
 
-    foreach(const QNetworkInterface &networkInterface, QNetworkInterface::allInterfaces()) {
+    for (const QNetworkInterface &networkInterface : QNetworkInterface::allInterfaces()) {
         if (networkInterface.flags() & QNetworkInterface::IsUp
             && networkInterface.flags() & QNetworkInterface::IsRunning
             && networkInterface.flags() & ~QNetworkInterface::IsLoopBack) {
             // we've decided that this is the active NIC
             // enumerate it's addresses to grab the IPv4 address
-            foreach(const QNetworkAddressEntry &entry, networkInterface.addressEntries()) {
+            for (const QNetworkAddressEntry &entry : networkInterface.addressEntries()) {
                 const auto& addressCandidate = entry.ip();
                 // make sure it's an IPv4 address that isn't the loopback
                 if (addressCandidate.protocol() == QAbstractSocket::IPv4Protocol && !addressCandidate.isLoopback()) {

@@ -22,12 +22,12 @@ class AtpReply : public QNetworkReply {
 public:
     AtpReply(const QUrl& url, QObject* parent = Q_NULLPTR);
     ~AtpReply();
-    qint64 bytesAvailable() const override;
-    void abort() override { }
-    bool isSequential() const override { return true; }
+    qint64 bytesAvailable() const;
+    void abort() { }
+    bool isSequential() const { return true; }
 
 protected:
-    qint64 readData(char* data, qint64 maxSize) override;
+    qint64 readData(char* data, qint64 maxSize);
 
 private:
     void handleRequestFinish();

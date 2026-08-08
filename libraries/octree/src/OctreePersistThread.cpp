@@ -19,6 +19,7 @@
 #include <time.h>
 
 #include <QDateTime>
+#include <QDataStream>
 #include <QDebug>
 #include <QDir>
 #include <QDirIterator>

@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/resources">
+        <file alias="describe-settings.json">../domain-server/resources/describe-settings.json</file>
+    </qresource>
+</RCC>

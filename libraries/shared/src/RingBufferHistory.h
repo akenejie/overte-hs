@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <iterator>
 
-#include <qvector.h>
+#include <QVector>
 
 template <typename T>
 class RingBufferHistory {

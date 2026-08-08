@@ -58,10 +58,11 @@ public:
 
     Q_INVOKABLE void executeOnPromiseThread(std::function<void()> function, MiniPromise::Promise root = nullptr) {
         if (QThread::currentThread() != thread()) {
+            auto selfRef = self();
             QMetaObject::invokeMethod(
                 this, "executeOnPromiseThread", Qt::QueuedConnection,
                 Q_ARG(std::function<void()>, function),
-                Q_ARG(MiniPromise::Promise, self()));
+                Q_ARG(MiniPromise::Promise, selfRef));
         } else {
             function();
         }

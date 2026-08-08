@@ -59,7 +59,7 @@ static const QHash<NodeType_t, QString> TYPE_CHAR_HASH {
     { NodeType::UpstreamAvatarMixer, "C" },
     { NodeType::DownstreamAudioMixer, "a" },
     { NodeType::DownstreamAvatarMixer, "w" },
-    { NodeType::Unassigned, QChar(1) }
+    { NodeType::Unassigned, QString(QChar(1)) }
 };
 
 const QString& NodeType::getNodeTypeName(NodeType_t nodeType) {

@@ -12,9 +12,9 @@
 
 #include "SockAddr.h"
 
-#include <qdatastream.h>
-#include <qhostinfo.h>
-#include <qnetworkinterface.h>
+#include <QDataStream>
+#include <QHostInfo>
+#include <QNetworkInterface>
 
 #include "NetworkLogging.h"
 
@@ -102,7 +102,7 @@ void SockAddr::handleLookupResult(const QHostInfo& hostInfo) {
         qCDebug(networking) << "Lookup failed for" << hostInfo.lookupId() << ":" << hostInfo.errorString();
         emit lookupFailed();
     } else {
-        foreach(const QHostAddress& address, hostInfo.addresses()) {
+        for(const auto& address : hostInfo.addresses()) {
             // just take the first IPv4 address
             if (address.protocol() == QAbstractSocket::IPv4Protocol) {
                 _address = address;

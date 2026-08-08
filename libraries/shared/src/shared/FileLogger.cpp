@@ -16,7 +16,6 @@
 
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
-#include <QtGui/QDesktopServices>
 
 #include "FileUtils.h"
 #include "NetworkUtils.h"
@@ -182,3 +181,4 @@ void FileLogger::sync() {
 }
 
 #include "FileLogger.moc"
+

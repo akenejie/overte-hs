@@ -15,6 +15,8 @@
 #ifndef hifi_DomainContentBackupManager_h
 #define hifi_DomainContentBackupManager_h
 
+#ifndef OVERTE_HEADLESS
+
 #include <RegisteredMetaTypes.h>
 
 #include <QString>
@@ -68,7 +70,9 @@ struct ConsolidatedBackupInfo {
 };
 
 class DomainContentBackupManager : public GenericThread {
+#ifndef OVERTE_HEADLESS
     Q_OBJECT
+#endif
 public:
     class BackupRule {
     public:
@@ -145,5 +149,7 @@ private:
     p_high_resolution_clock::time_point _lastCheck;
     std::vector<BackupRule> _backupRules;
 };
+
+#endif // OVERTE_HEADLESS
 
 #endif  // hifi_DomainContentBackupManager_h

@@ -90,7 +90,7 @@ void DomainMetadata::descriptorsChanged() {
     auto& state = *static_cast<QVariantMap*>(_metadata[DESCRIPTORS].data());
 
     static const QString DESCRIPTORS_GROUP_KEYPATH = "descriptors";
-    auto descriptorsMap = static_cast<DomainServer*>(parent())->_settingsManager.valueForKeyPath(DESCRIPTORS).toMap();
+    auto descriptorsMap = ((DomainServer*)(parent()))->_settingsManager.valueForKeyPath(DESCRIPTORS).toMap();
 
     // copy simple descriptors
     if (!descriptorsMap[Descriptors::NAME].isNull()) {
@@ -130,7 +130,7 @@ void DomainMetadata::descriptorsChanged() {
 
     // parse capacity
     static const QString CAPACITY = "security.maximum_user_capacity";
-    QVariant capacityVariant = static_cast<DomainServer*>(parent())->_settingsManager.valueForKeyPath(CAPACITY);
+    QVariant capacityVariant = ((DomainServer*)(parent()))->_settingsManager.valueForKeyPath(CAPACITY);
     unsigned int capacity = capacityVariant.isValid() ? capacityVariant.toUInt() : 0;
     state[Descriptors::CAPACITY] = capacity;
 
@@ -152,7 +152,7 @@ void DomainMetadata::securityChanged(bool send) {
 
     QString restriction;
 
-    const auto& settingsManager = static_cast<DomainServer*>(parent())->_settingsManager;
+    const auto& settingsManager = ((DomainServer*)(parent()))->_settingsManager;
     bool hasAnonymousAccess = settingsManager.getStandardPermissionsForName(NodePermissions::standardNameAnonymous).can(
         NodePermissions::Permission::canConnectToDomain);
     bool hasHifiAccess = settingsManager.getStandardPermissionsForName(NodePermissions::standardNameLoggedIn).can(

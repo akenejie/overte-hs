@@ -19,7 +19,9 @@
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #endif
 
+#if !defined(OVERTE_HEADLESS)
 #include <draco/compression/decode.h>
+#endif
 
 #ifdef _WIN32
 #pragma warning( pop )
@@ -350,6 +352,7 @@ ExtractedMesh FBXSerializer::extractMesh(const FBXNode& object, unsigned int& me
                 }
             }
         } else if (child.name == "DracoMesh") {
+#if !defined(OVERTE_HEADLESS)
             isDracoMesh = true;
             data.extracted.mesh.wasCompressed = true;
 
@@ -513,6 +516,10 @@ ExtractedMesh FBXSerializer::extractMesh(const FBXNode& object, unsigned int& me
                 part.triangleIndices.append(dracoFace[1].value());
                 part.triangleIndices.append(dracoFace[2].value());
             }
+#else
+            qCWarning(modelformat) << "Draco mesh in FBX is not supported in the headless build; skipping mesh.";
+            isDracoMesh = false;
+#endif
         }
     }
 

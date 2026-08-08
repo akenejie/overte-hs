@@ -11,6 +11,8 @@
 
 #include "EntitiesBackupHandler.h"
 
+#ifndef OVERTE_HEADLESS
+
 #include <QDebug>
 
 #if !defined(__clang__) && defined(__GNUC__)
@@ -95,3 +97,4 @@ std::pair<bool, QString> EntitiesBackupHandler::recoverBackup(const QString& bac
     }
     return { true, QString() };
 }
+#endif

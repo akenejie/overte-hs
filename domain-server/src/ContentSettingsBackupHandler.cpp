@@ -9,6 +9,8 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+#ifndef OVERTE_HEADLESS
+
 #include "ContentSettingsBackupHandler.h"
 #include "DomainContentBackupManager.h"
 
@@ -129,3 +131,5 @@ std::pair<bool, QString> ContentSettingsBackupHandler::recoverBackup(const QStri
     }
     return { true, QString() };
 }
+
+#endif // OVERTE_HEADLESS

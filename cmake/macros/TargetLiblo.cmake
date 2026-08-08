@@ -1,4 +1,7 @@
 macro(target_liblo)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     find_package(liblo QUIET REQUIRED)
     target_link_libraries(${TARGET_NAME} liblo::liblo)
 endmacro()

@@ -1,4 +1,7 @@
 macro(target_egl)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     find_library(EGL EGL)
     target_link_libraries(${TARGET_NAME} ${EGL})
 endmacro()

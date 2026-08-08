@@ -111,7 +111,7 @@ void HifiConfigVariantMap::loadMapFromJSONFile(QVariantMap& existingMap, const Q
 }
 
 void HifiConfigVariantMap::addMissingValuesToExistingMap(QVariantMap& existingMap, const QVariantMap& newMap) {
-    foreach(const QString& key, newMap.keys()) {
+    for (const QString& key : newMap.keys()) {
         if (existingMap.contains(key)) {
             // if this is just a regular value, we're done - we don't ovveride
 

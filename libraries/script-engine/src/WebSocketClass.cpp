@@ -14,6 +14,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 //
 
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include "WebSocketClass.h"
 
 #include "ScriptContext.h"
@@ -240,3 +241,5 @@ bool wscReadyStateFromScriptValue(const ScriptValue& object, WebSocketClass::Rea
     readyState = (WebSocketClass::ReadyState)object.toUInt16();
     return true;
 }
+
+#endif // OVERTE_NO_QTWEBSOCKET

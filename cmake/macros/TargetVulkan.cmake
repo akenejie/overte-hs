@@ -5,6 +5,9 @@
 #  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 # 
 macro(TARGET_VULKAN)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     find_package(Vulkan QUIET REQUIRED)
     find_package(VulkanMemoryAllocator QUIET REQUIRED)
     find_package(Qt5 COMPONENTS X11Extras QUIET REQUIRED)

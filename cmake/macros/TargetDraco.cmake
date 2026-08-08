@@ -1,4 +1,7 @@
 macro(TARGET_DRACO)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if (OVERTE_USE_SYSTEM_LIBS)
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(Draco REQUIRED draco)

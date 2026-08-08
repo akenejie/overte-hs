@@ -25,7 +25,9 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QSaveFile>
 #include <QtCore/QString>
+#ifndef OVERTE_HEADLESS
 #include <QtGui/QImageReader>
+#endif
 #include <QtCore/QVector>
 #include <QtCore/QUrlQuery>
 

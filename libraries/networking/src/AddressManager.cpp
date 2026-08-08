@@ -14,8 +14,10 @@
 
 #include "AddressManager.h"
 
+#ifndef OVERTE_HEADLESS
 #include <QGuiApplication>
 #include <QClipboard>
+#endif
 #include <QDebug>
 #include <QJsonDocument>
 #include <QRegExp>
@@ -280,8 +282,18 @@ bool AddressManager::handleUrl(const QUrl& lookupUrlIn, LookupTrigger trigger, c
 
         if (lookupUrl.host().isEmpty()) {
             // this was in the form hifi:/somewhere or hifi:somewhere.  Fix it by making it hifi://somewhere
-            static const QRegExp HIFI_SCHEME_REGEX = QRegExp(URL_SCHEME_OVERTE + ":\\/{0,2}", Qt::CaseInsensitive);
-            lookupUrl = QUrl(lookupUrl.toString().replace(HIFI_SCHEME_REGEX, URL_SCHEME_OVERTE + "://"));
+            QString urlStr = lookupUrl.toString();
+            if (urlStr.startsWith(URL_SCHEME_OVERTE + ":")) {
+                int slashCount = 0;
+                int pos = urlStr.indexOf('/');
+                if (pos == URL_SCHEME_OVERTE.length() + 1) {
+                    slashCount = 0;
+                } else if (pos == URL_SCHEME_OVERTE.length() + 2 && urlStr[URL_SCHEME_OVERTE.length() + 1] == '/') {
+                    slashCount = 1;
+                }
+                urlStr = URL_SCHEME_OVERTE + "://" + urlStr.mid(URL_SCHEME_OVERTE.length() + 1 + slashCount);
+            }
+            lookupUrl = QUrl(urlStr);
         }
 
         DependencyManager::get<NodeList>()->flagTimeForConnectionStep(LimitedNodeList::ConnectionStep::LookupAddress);
@@ -840,7 +852,7 @@ bool AddressManager::handleUsername(const QString& lookupString) {
 }
 
 bool AddressManager::setHost(const QString& host, LookupTrigger trigger, quint16 port) {
-    bool hostHasChanged = QString::compare(host, _domainURL.host(), Qt::CaseInsensitive);
+    bool hostHasChanged = host.compare(_domainURL.host(), Qt::CaseInsensitive);
     if (hostHasChanged || port != _domainURL.port()) {
         addCurrentAddressToHistory(trigger);
 
@@ -938,21 +950,29 @@ void AddressManager::refreshPreviousLookup() {
 }
 
 void AddressManager::copyAddress() {
+#ifdef OVERTE_HEADLESS
+    (void)qApp;
+#else
     if (QThread::currentThread() != qApp->thread()) {
         QMetaObject::invokeMethod(qApp, "copyToClipboard", Q_ARG(QString, currentShareableAddress().toString()));
         return;
     }
     // assume that the address is being copied because the user wants a shareable address
     QGuiApplication::clipboard()->setText(currentShareableAddress().toString());
+#endif
 }
 
 void AddressManager::copyPath() {
+#ifdef OVERTE_HEADLESS
+    (void)qApp;
+#else
     if (QThread::currentThread() != qApp->thread()) {
         QMetaObject::invokeMethod(qApp, "copyToClipboard", Q_ARG(QString, currentPath()));
         return;
     }
 
     QGuiApplication::clipboard()->setText(currentPath());
+#endif
 }
 
 QString AddressManager::getDomainID() const {

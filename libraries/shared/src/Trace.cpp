@@ -96,8 +96,8 @@ void TraceEvent::writeJson(QTextStream& out) const {
         ev["args"] = QJsonObject::fromVariantMap(args);
     }
     if (!extra.empty()) {
-        auto it = extra.begin();
-        for (; it != extra.end(); it++) {
+        auto it = extra.constBegin();
+        for (; it != extra.constEnd(); it++) {
             ev[it.key()] = QJsonValue::fromVariant(it.value());
         }
     }
@@ -147,7 +147,7 @@ void Tracer::serialize(const QString& filename) {
     {
         QFile file(fullPath);
         if (!file.open(QIODevice::WriteOnly)) {
-            qDebug(shared) << "failed to open file '" << fullPath << "'";
+            qDebug() << "failed to open file '" << fullPath << "'";
             return;
         }
         file.write(data);

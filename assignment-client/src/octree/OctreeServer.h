@@ -127,7 +127,9 @@ public:
     static int howManyThreadsDidHandlePacketSend(quint64 since = 0);
     static int howManyThreadsDidCallWriteDatagram(quint64 since = 0);
 
+#ifndef OVERTE_HEADLESS
     bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) override;
+#endif
 
     virtual void aboutToFinish() override;
 
@@ -156,7 +158,9 @@ protected:
     void readConfiguration();
     virtual void readAdditionalConfiguration(const QJsonObject& settingsSectionObject) { };
     void parsePayload();
+#ifndef OVERTE_HEADLESS
     void initHTTPManager(int port);
+#endif
     void resetSendingStats();
     QString getUptime();
     double getUptimeSeconds();
@@ -177,7 +181,9 @@ protected:
 
     bool _isShuttingDown = false;
 
+#ifndef OVERTE_HEADLESS
     std::unique_ptr<HTTPManager> _httpManager;
+#endif
     int _statusPort;
     QString _statusHost;
 

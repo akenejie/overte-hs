@@ -13,6 +13,11 @@
 
 #include <limits>
 
+#ifndef OVERTE_HEADLESS
+#include <QtGui/QColor>
+#include <QtGui/QMatrix4x4>
+#endif
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "NumericalConstants.h"
@@ -464,17 +469,21 @@ vec4 toGlm(const glm::u8vec3& color, float alpha) {
     return vec4(glm::vec3(color) / MAX_COLOR, alpha);
 }
 
+#ifndef OVERTE_HEADLESS
 glm::vec4 toGlm(const QColor& color) {
     return glm::vec4(color.redF(), color.greenF(), color.blueF(), color.alphaF());
 }
+#endif
 
 ivec4 toGlm(const QRect& rect) {
     return ivec4(rect.x(), rect.y(), rect.width(), rect.height());
 }
 
+#ifndef OVERTE_HEADLESS
 QMatrix4x4 fromGlm(const glm::mat4 & m) {
   return QMatrix4x4(&m[0][0]).transposed();
 }
+#endif
 
 QSize fromGlm(const glm::ivec2 & v) {
     return QSize(v.x, v.y);

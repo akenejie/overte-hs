@@ -19,7 +19,9 @@
 
 #include <AccountManager.h>
 #include <Gzip.h>
+#ifndef OVERTE_HEADLESS
 #include <HTTPConnection.h>
+#endif
 #include <LogHandler.h>
 #include <shared/NetworkUtils.h>
 #include <NumericalConstants.h>
@@ -235,7 +237,9 @@ OctreeServer::OctreeServer(ReceivedMessage& message) :
     _argc(0),
     _argv(nullptr),
     _parsedArgV(nullptr),
+#ifndef OVERTE_HEADLESS
     _httpManager(nullptr),
+#endif
     _statusPort(0),
     _packetsPerClientPerInterval(10),
     _packetsTotalPerInterval(DEFAULT_PACKETS_PER_INTERVAL),
@@ -279,6 +283,7 @@ OctreeServer::~OctreeServer() {
     qDebug() << qPrintable(_safeServerName) << "server DONE shutting down... [" << this << "]";
 }
 
+#ifndef OVERTE_HEADLESS
 void OctreeServer::initHTTPManager(int port) {
     // setup the embedded web server
     QString documentRoot = QString("%1/web").arg(PathUtils::getAppDataPath());
@@ -861,6 +866,7 @@ bool OctreeServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
     }
 
 }
+#endif // OVERTE_HEADLESS
 
 void OctreeServer::setArguments(int argc, char** argv) {
     _argc = argc;
@@ -1035,7 +1041,9 @@ void OctreeServer::readConfiguration() {
     qDebug("statusHost=%s", qPrintable(_statusHost));
 
     if (readOptionInt(QString("statusPort"), settingsSectionObject, _statusPort)) {
+#ifndef OVERTE_HEADLESS
         initHTTPManager(_statusPort);
+#endif
         qDebug() << "statusPort=" << _statusPort;
     } else {
         qDebug() << "statusPort= DISABLED";

@@ -6,6 +6,9 @@
 #  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 #
 macro(TARGET_SIXENSE)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if(NOT APPLE)
         add_dependency_external_projects(sixense)
         find_package(Sixense REQUIRED)

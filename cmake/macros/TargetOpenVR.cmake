@@ -7,6 +7,9 @@
 #  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 #
 macro(TARGET_OPENVR)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     if(OVERTE_USE_SYSTEM_LIBS)
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(OpenVR REQUIRED openvr)

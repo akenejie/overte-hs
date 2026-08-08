@@ -11,9 +11,17 @@
 
 #include "HelperScriptEngine.h"
 
+#include "ScriptEngine.h"
+
 HelperScriptEngine::HelperScriptEngine() {
     std::lock_guard<std::mutex> lock(_scriptEngineLock);
     _scriptEngine = newScriptEngine();
+    if (!_scriptEngine) {
+        // Headless builds have no scripting backend (no V8). All helper
+        // operations become no-ops so the entity tree can still be used for
+        // packet-based entity networking.
+        return;
+    }
     _scriptEngineThread.reset(new QThread());
     _scriptEngine->setThread(_scriptEngineThread.get());
     _scriptEngineThread->start();

@@ -15,7 +15,7 @@
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 
-#include <qdebug.h>
+#include <QDebug>
 
 #include "NetworkLogging.h"
 #include "WarningsSuppression.h"

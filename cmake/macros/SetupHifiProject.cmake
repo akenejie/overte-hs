@@ -31,19 +31,25 @@ macro(SETUP_HIFI_PROJECT)
   set(${TARGET_NAME}_DEPENDENCY_QT_MODULES ${ARGN})
   list(APPEND ${TARGET_NAME}_DEPENDENCY_QT_MODULES Core)
 
-  # find these Qt modules and link them to our own target
-  find_package(Qt5 COMPONENTS ${${TARGET_NAME}_DEPENDENCY_QT_MODULES} QUIET REQUIRED)
+  if (OVERTE_HEADLESS)
+    # Headless mode: use real Qt5 with MOC, exclude WebSockets (not installed)
+    target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_HEADLESS QT_CORE_LIB QT_GUI_LIB)
+    set(_QT_MODULES ${${TARGET_NAME}_DEPENDENCY_QT_MODULES})
+    list(REMOVE_ITEM _QT_MODULES WebSockets Qt5WebSockets)
+    find_package(Qt5 COMPONENTS ${_QT_MODULES} QUIET)
+    foreach(QT_MODULE ${_QT_MODULES})
+      if(TARGET Qt5::${QT_MODULE})
+        target_link_libraries(${TARGET_NAME} Qt5::${QT_MODULE})
+      endif()
+    endforeach()
+  else()
+    # find these Qt modules and link them to our own target
+    find_package(Qt5 COMPONENTS ${${TARGET_NAME}_DEPENDENCY_QT_MODULES} QUIET REQUIRED)
 
-  # disable /OPT:REF and /OPT:ICF for the Debug builds
-  # This will prevent the following linker warnings
-  # LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/OPT:ICF' specification
-  if (WIN32)
-     set_property(TARGET ${TARGET_NAME} APPEND_STRING PROPERTY LINK_FLAGS_DEBUG "/OPT:NOREF /OPT:NOICF")
+    foreach(QT_MODULE ${${TARGET_NAME}_DEPENDENCY_QT_MODULES})
+      target_link_libraries(${TARGET_NAME} Qt5::${QT_MODULE})
+    endforeach()
   endif()
-
-  foreach(QT_MODULE ${${TARGET_NAME}_DEPENDENCY_QT_MODULES})
-    target_link_libraries(${TARGET_NAME} Qt5::${QT_MODULE})
-  endforeach()
   target_link_libraries(${TARGET_NAME} ${CMAKE_THREAD_LIBS_INIT})
 
   target_glm()

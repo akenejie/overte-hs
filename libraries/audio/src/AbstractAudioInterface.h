@@ -13,7 +13,9 @@
 #define hifi_AbstractAudioInterface_h
 
 #include <QtCore/QObject>
+#ifndef OVERTE_HEADLESS
 #include <QtMultimedia/qaudiooutput.h>
+#endif
 
 #include <udt/PacketHeaders.h>
 

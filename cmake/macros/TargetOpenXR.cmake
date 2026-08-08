@@ -7,6 +7,9 @@
 #  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 #
 macro(TARGET_OPENXR)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     find_package(OpenXR QUIET REQUIRED)
     target_link_libraries(${TARGET_NAME} OpenXR::openxr_loader)
 endmacro()

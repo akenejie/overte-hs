@@ -26,7 +26,7 @@
 #include <GLMHelpers.h>
 
 #include "TGAReader.h"
-#if !defined(Q_OS_ANDROID)
+#if !defined(Q_OS_ANDROID) && !defined(OVERTE_HEADLESS)
 #include "OpenEXRReader.h"
 #endif
 #include "ImageLogging.h"
@@ -275,7 +275,7 @@ Image processRawImageData(QIODevice& content, const std::string& filename) {
         }
         content.reset();
     } 
-#if !defined(Q_OS_ANDROID)
+#if !defined(Q_OS_ANDROID) && !defined(OVERTE_HEADLESS)
     else if (filenameExtension == "exr") {
         Image image = image::readOpenEXR(content, filename);
         if (!image.isNull()) {
@@ -519,6 +519,7 @@ public:
         }
     }
 };
+#endif // NVTT_API
 
 void convertToFloatFromPacked(const unsigned char* source, int width, int height, size_t srcLineByteStride, gpu::Element sourceFormat,
                               glm::vec4* output, size_t outputLinePixelStride) {
@@ -559,6 +560,7 @@ void convertToPackedFromFloat(unsigned char* output, int width, int height, size
         sourceIt += srcLinePixelStride;
     }
 }
+#if defined(NVTT_API)
 
 nvtt::OutputHandler* getNVTTCompressionOutputHandler(gpu::Texture* outputTexture, int face, nvtt::CompressionOptions& compressionOptions) {
     auto outputFormat = outputTexture->getStoredMipFormat();
@@ -838,6 +840,7 @@ void convertImageToLDRTexture(gpu::Texture* texture, Image&& image, BackendTarge
 
 #endif
 
+#if !defined(OVERTE_HEADLESS)
 void convertImageToTexture(gpu::Texture* texture, Image& image, BackendTarget target, int face, int baseMipLevel, bool buildMips, const std::atomic<bool>& abortProcessing) {
     PROFILE_RANGE(resource_parse, "convertToTextureWithMips");
 
@@ -860,6 +863,22 @@ void convertToTexture(gpu::Texture* texture, Image&& image, BackendTarget target
     PROFILE_RANGE(resource_parse, "convertToTexture");
     convertImageToTexture(texture, image, target, face, mipLevel, false, abortProcessing);
 }
+#else
+// The headless build has no GPU, so there is nothing to upload or compress.
+// The base mip data has already been stored on the texture via assignStoredMip()
+// by the callers of these functions.
+void convertImageToTexture(gpu::Texture* texture, Image& image, BackendTarget target, int face, int baseMipLevel, bool buildMips, const std::atomic<bool>& abortProcessing) {
+    (void)texture; (void)image; (void)target; (void)face; (void)baseMipLevel; (void)buildMips; (void)abortProcessing;
+}
+
+void convertToTextureWithMips(gpu::Texture* texture, Image&& image, BackendTarget target, const std::atomic<bool>& abortProcessing, int face) {
+    (void)texture; (void)image; (void)target; (void)abortProcessing; (void)face;
+}
+
+void convertToTexture(gpu::Texture* texture, Image&& image, BackendTarget target, const std::atomic<bool>& abortProcessing, int face, int mipLevel) {
+    (void)texture; (void)image; (void)target; (void)abortProcessing; (void)face; (void)mipLevel;
+}
+#endif
 
 void processTextureAlpha(const Image& srcImage, bool& validAlpha, bool& alphaAsMask) {
     PROFILE_RANGE(resource_parse, "processTextureAlpha");

@@ -9,6 +9,8 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+#ifndef OVERTE_HEADLESS
+
 #include "AssetsBackupHandler.h"
 
 #include <QJsonDocument>
@@ -628,3 +630,5 @@ void AssetsBackupHandler::updateMappings() {
     request->start();
     ++_mappingRequestsInFlight;
 }
+
+#endif // OVERTE_HEADLESS

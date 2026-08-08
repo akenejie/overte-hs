@@ -66,12 +66,27 @@ macro(SETUP_HIFI_LIBRARY)
   set(${TARGET_NAME}_DEPENDENCY_QT_MODULES ${ARGN})
   list(APPEND ${TARGET_NAME}_DEPENDENCY_QT_MODULES Core)
 
-  # find these Qt modules and link them to our own target
-  find_package(Qt5 COMPONENTS ${${TARGET_NAME}_DEPENDENCY_QT_MODULES} QUIET REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
+  if (OVERTE_HEADLESS)
+    # Headless mode: use real Qt5 with MOC, exclude WebSockets (not installed)
+    target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_HEADLESS QT_CORE_LIB QT_GUI_LIB)
+    set(_QT_MODULES ${${TARGET_NAME}_DEPENDENCY_QT_MODULES})
+    list(REMOVE_ITEM _QT_MODULES WebSockets Qt5WebSockets)
+    if(_QT_MODULES)
+      find_package(Qt5 COMPONENTS ${_QT_MODULES} QUIET)
+      foreach(QT_MODULE ${_QT_MODULES})
+        if(TARGET Qt5::${QT_MODULE})
+          target_link_libraries(${TARGET_NAME} Qt5::${QT_MODULE})
+        endif()
+      endforeach()
+    endif()
+  else()
+    # find these Qt modules and link them to our own target
+    find_package(Qt5 COMPONENTS ${${TARGET_NAME}_DEPENDENCY_QT_MODULES} QUIET REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
 
-  foreach(QT_MODULE ${${TARGET_NAME}_DEPENDENCY_QT_MODULES})
-    target_link_libraries(${TARGET_NAME} Qt5::${QT_MODULE})
-  endforeach()
+    foreach(QT_MODULE ${${TARGET_NAME}_DEPENDENCY_QT_MODULES})
+      target_link_libraries(${TARGET_NAME} Qt5::${QT_MODULE})
+    endforeach()
+  endif()
 
   # Don't make scribed shaders, generated entity files, generated pipelines, or QT resource files cumulative
   set(AUTOSCRIBE_SHADER_LIB_SRC "")

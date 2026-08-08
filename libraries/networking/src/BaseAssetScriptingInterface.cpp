@@ -246,7 +246,7 @@ Promise BaseAssetScriptingInterface::downloadBytes(QString hash) {
     QPointer<AssetRequest> assetRequest = assetClient()->createRequest(hash);
     Promise deferred = makePromise(__FUNCTION__);
 
-    QObject::connect(assetRequest, &AssetRequest::finished, assetRequest, [deferred](AssetRequest* request) {
+    QObject::connect(assetRequest.data(), &AssetRequest::finished, assetRequest.data(), [deferred](AssetRequest* request) {
         // note: we are now on the "Resource Manager" thread
         Q_ASSERT(QThread::currentThread() == request->thread());
         Q_ASSERT(request->getState() == AssetRequest::Finished);
@@ -262,7 +262,7 @@ Promise BaseAssetScriptingInterface::downloadBytes(QString hash) {
                 { "data", data },
             };
         } else {
-            error = request->getError();
+            error = QString::number(request->getError());
             result = { { "error", request->getError() } };
         }
         // forward thread-safe copies back to our thread
@@ -278,7 +278,7 @@ Promise BaseAssetScriptingInterface::uploadBytes(const QByteArray& bytes) {
     QPointer<AssetUpload> upload = assetClient()->createUpload(bytes);
 
     const auto byteLength = bytes.size();
-    QObject::connect(upload, &AssetUpload::finished, upload, [=](AssetUpload* upload, const QString& hash) {
+    QObject::connect(upload.data(), &AssetUpload::finished, upload.data(), [=](AssetUpload* upload, const QString& hash) {
         Q_ASSERT(QThread::currentThread() == upload->thread());
         // note: we are now on the "Resource Manager" thread
         QString error;
@@ -317,7 +317,7 @@ Promise BaseAssetScriptingInterface::getAssetInfo(QString asset) {
     } else if (AssetUtils::isValidFilePath(path)) {
         QPointer<GetMappingRequest> request = assetClient()->createGetMappingRequest(path);
 
-        QObject::connect(request, &GetMappingRequest::finished, request, [=]() {
+        QObject::connect(request.data(), &GetMappingRequest::finished, request.data(), [=]() {
             Q_ASSERT(QThread::currentThread() == request->thread());
             // note: we are now on the "Resource Manager" thread
             QString error;
@@ -352,7 +352,7 @@ Promise BaseAssetScriptingInterface::symlinkAsset(QString hash, QString path) {
     auto deferred = makePromise(__FUNCTION__);
     QPointer<SetMappingRequest> setMappingRequest = assetClient()->createSetMappingRequest(path, hash);
 
-    connect(setMappingRequest, &SetMappingRequest::finished, setMappingRequest, [=](SetMappingRequest* request) {
+    QObject::connect(setMappingRequest.data(), &SetMappingRequest::finished, setMappingRequest.data(), [=](SetMappingRequest* request) {
         Q_ASSERT(QThread::currentThread() == request->thread());
         // we are now on the "Resource Manager" thread
         QString error;

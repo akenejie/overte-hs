@@ -1,4 +1,7 @@
 macro(TARGET_VHACD)
+    if (OVERTE_HEADLESS)
+        return()
+    endif()
     find_package(v-hacd QUIET REQUIRED)
     target_link_libraries(${TARGET_NAME} v-hacd::v-hacd)
 endmacro()

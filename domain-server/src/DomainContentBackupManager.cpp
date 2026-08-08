@@ -10,6 +10,8 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+#ifndef OVERTE_HEADLESS
+
 #include "DomainContentBackupManager.h"
 
 #include <chrono>
@@ -739,3 +741,5 @@ std::pair<bool, QString> DomainContentBackupManager::createBackup(const QString&
 
     return { true, path };
 }
+
+#endif // OVERTE_HEADLESS

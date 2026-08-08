@@ -54,7 +54,9 @@
 #include <plugins/CodecPlugin.h>
 #include <plugins/PluginManager.h>
 
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include <WebSocketServerClass.h>
+#endif
 #include <EntityScriptingInterface.h> // TODO: consider moving to scriptengine.h
 
 #include <hfm/ModelFormatRegistry.h>
@@ -511,8 +513,10 @@ void Agent::executeScript() {
         scriptEngine->registerGlobalObject(sgp, "SoundCache", DependencyManager::get<SoundCacheScriptingInterface>().data());
 
         {
+#ifndef OVERTE_NO_QTWEBSOCKET
             ScriptValue webSocketServerConstructorValue = scriptEngine->newFunction(WebSocketServerClass::constructor);
             scriptEngine->globalObject().setProperty("WebSocketServer", webSocketServerConstructorValue);
+#endif
         }
 
         auto entityScriptingInterface = DependencyManager::get<EntityScriptingInterface>();

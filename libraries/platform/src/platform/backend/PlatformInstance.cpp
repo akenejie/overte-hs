@@ -10,7 +10,9 @@
 #include "PlatformInstance.h"
 #include <QNetworkInterface>
 
+#ifndef OVERTE_HEADLESS
 #include <gl/GLHelpers.h>
+#endif
 #include "../PlatformKeys.h"
 #include "../Profiler.h"
 
@@ -104,8 +106,7 @@ void Instance::updatePrimaryIndices() {
 }
 
 void Instance::enumerateNics() {
-    QNetworkInterface interface;
-    foreach(interface, interface.allInterfaces()) {
+    foreach(auto interface, QNetworkInterface::allInterfaces()) {
         if (interface.flags().testFlag(QNetworkInterface::IsRunning) && !interface.hardwareAddress().isEmpty()) {
             json nic = {};
             nic[keys::nic::mac] = interface.hardwareAddress().toUtf8().constData();
@@ -123,6 +124,7 @@ static std::string vkVersionToString(uint32_t version) {
 
 
 void Instance::enumerateGraphicsApis() {
+#ifndef OVERTE_HEADLESS
     // OpenGL rendering API is supported on all platforms
     {
         auto& glContextInfo = gl::ContextInfo::get();
@@ -135,6 +137,7 @@ void Instance::enumerateGraphicsApis() {
         gl[keys::graphicsAPI::gl::extensions] = glContextInfo.extensions;
         _graphicsApis.push_back(gl);
     }
+#endif
 
 #if defined(HAVE_VULKAN)
     // Vulkan rendering API is supported on all platforms (sort of)

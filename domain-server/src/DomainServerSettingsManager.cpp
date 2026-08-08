@@ -5,7 +5,6 @@
 //  Created by Stephen Birarda on 2014-06-24.
 //  Copyright 2014 High Fidelity, Inc.
 //  Copyright 2020 Vircadia contributors.
-//
 //  Distributed under the Apache License, Version 2.0.
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
@@ -69,6 +68,13 @@ DomainServerSettingsManager::DomainServerSettingsManager() {
     QFile descriptionFile(descriptionFilePath);
     descriptionFile.open(QIODevice::ReadOnly);
 
+    // If the file is not present next to the binary (e.g. a single-file multicall build),
+    // fall back to the embedded resource.
+    if (!descriptionFile.isOpen()) {
+        descriptionFile.setFileName(":/resources/describe-settings.json");
+        descriptionFile.open(QIODevice::ReadOnly);
+    }
+
     QJsonParseError parseError;
     QJsonDocument descriptionDocument = QJsonDocument::fromJson(descriptionFile.readAll(), &parseError);
 
@@ -91,7 +97,7 @@ DomainServerSettingsManager::DomainServerSettingsManager() {
     }
 
     static const QString MISSING_SETTINGS_DESC_MSG =
-        QString("Did not find settings description in JSON at %1 - Unable to continue. domain-server will quit.\n%2 at %3")
+        QString("Did not find settings description in JSON at %1 or :/resources/describe-settings.json - Unable to continue. domain-server will quit.\n%2 at %3")
         .arg(descriptionFilePath).arg(parseError.errorString()).arg(parseError.offset);
     static const int MISSING_SETTINGS_DESC_ERROR_CODE = 6;
 
@@ -701,7 +707,7 @@ bool DomainServerSettingsManager::unpackPermissionsForKeypath(const QString& key
 
     bool needPack = false;
 
-    QList<QVariant> permissionsList = permissions.toList();
+    QVariantList permissionsList = permissions.toList();
     foreach (QVariant permsHash, permissionsList) {
         NodePermissionsPointer perms { new NodePermissions(permsHash.toMap()) };
         QString id = perms->getID();
@@ -1605,6 +1611,7 @@ QJsonObject DomainServerSettingsManager::settingsResponseObjectForType(const QSt
 
         qDebug() << "Reading certificate file at" << certPath << "for HTTPS.";
 
+#ifndef QT_NO_SSL
         QFile certFile(certPath);
         certFile.open(QIODevice::ReadOnly);
 
@@ -1613,6 +1620,7 @@ QJsonObject DomainServerSettingsManager::settingsResponseObjectForType(const QSt
         auto groupObject = responseObject["oauth"].toObject();
         groupObject["cert-fingerprint"] = digest;
         responseObject["oauth"] = groupObject;
+#endif
     }
 
     return responseObject;
@@ -1745,6 +1753,7 @@ bool DomainServerSettingsManager::recurseJSONObjectAndOverwriteSettings(const QJ
     auto& filteredDescriptionArray = settingsType == DomainSettings ? _domainSettingsDescription : _contentSettingsDescription;
 
     auto oauthObject = postedObject[OAUTH_ROOT_KEY].toObject();
+#ifndef QT_NO_SSL
     if (oauthObject.contains(OAUTH_CERT_CONTENTS)) {
         QSslCertificate cert(oauthObject[OAUTH_CERT_CONTENTS].toString().toUtf8());
         if (!cert.isNull()) {
@@ -1775,6 +1784,7 @@ bool DomainServerSettingsManager::recurseJSONObjectAndOverwriteSettings(const QJ
         }
         oauthObject.remove(OAUTH_KEY_CONTENTS);
     }
+#endif
 
     postedObject[OAUTH_ROOT_KEY] = oauthObject;
 
@@ -2302,3 +2312,4 @@ void DomainServerSettingsManager::debugDumpGroupsState() {
         qDebug() << "|  " << userName << line;
     }
 }
+

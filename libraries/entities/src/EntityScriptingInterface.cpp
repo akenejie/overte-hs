@@ -17,7 +17,9 @@
 #include <glm/gtx/transform.hpp>
 
 #include <QFutureWatcher>
+#if !defined(OVERTE_HEADLESS)
 #include <QtConcurrent/QtConcurrentRun>
+#endif
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QJsonArray>

@@ -13,6 +13,7 @@
 //  SPDX-License-Identifier: Apache-2.0
 //
 
+#ifndef OVERTE_NO_QTWEBSOCKET
 #include "WebSocketServerClass.h"
 
 #include "ScriptContext.h"
@@ -72,3 +73,5 @@ void WebSocketServerClass::close() {
     }
     _webSocketServer.close();
 }
+
+#endif // OVERTE_NO_QTWEBSOCKET

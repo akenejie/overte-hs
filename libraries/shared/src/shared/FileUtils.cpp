@@ -22,7 +22,10 @@
 #include <QtCore/QTextStream>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QFileSelector>
+#include <QtCore/QStandardPaths>
+#ifndef OVERTE_HEADLESS
 #include <QtGui/QDesktopServices>
+#endif
 
 #include "GlobalAppProperties.h"
 
@@ -120,10 +123,14 @@ void FileUtils::locateFile(const QString& filePath) {
 #endif
 
     // fallback, open enclosing folder
+#ifndef OVERTE_HEADLESS
     if (!success) {
         const QString folder = fileInfo.path();
         QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
     }
+#else
+    (void)success;
+#endif
 }
 
 QString FileUtils::standardPath(QString subfolder) {
@@ -173,7 +180,7 @@ bool FileUtils::canCreateFile(const QString& fullPath) {
     // If the file exists and we can't remove it, fail early
     QFileInfo fileInfo(fullPath);
     if (fileInfo.exists() && !QFile::remove(fullPath)) {
-        qDebug(shared) << "unable to overwrite file '" << fullPath << "'";
+        qDebug() << "unable to overwrite file '" << fullPath << "'";
         return false;
     }
 
@@ -181,7 +188,7 @@ bool FileUtils::canCreateFile(const QString& fullPath) {
     QDir dir(absolutePath);
     if (!dir.exists()) {
         if (!dir.mkpath(absolutePath)) {
-            qDebug(shared) << "unable to create dir '" << absolutePath << "'";
+            qDebug() << "unable to create dir '" << absolutePath << "'";
             return false;
         }
     }

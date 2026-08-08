@@ -27,7 +27,8 @@
 #include <QtNetwork/QHttpMultiPart>
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
-#include <qthread.h>
+#include <QtNetwork/QSslConfiguration>
+#include <QThread>
 
 #include <SettingHandle.h>
 
@@ -338,7 +339,7 @@ void AccountManager::sendRequest(const QString& path,
     if (networkReply) {
         if (!propertyMap.isEmpty()) {
             // we have properties to set on the reply so the user can check them after
-            foreach(const QString& propertyKey, propertyMap.keys()) {
+            for(const auto& propertyKey : propertyMap.keys()) {
                 networkReply->setProperty(qPrintable(propertyKey), propertyMap.value(propertyKey));
             }
         }
@@ -968,7 +969,9 @@ void AccountManager::generateNewKeypair(bool isUserKeypair, const QUuid& domainI
     }
 
     // Ensure openssl/Qt config is set up.
+#ifndef QT_NO_SSL
     QSslConfiguration::defaultConfiguration();
+#endif
 
     // make sure we don't already have an outbound keypair generation request
     if (!_isWaitingForKeypairResponse) {

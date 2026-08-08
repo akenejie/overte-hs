@@ -18,8 +18,13 @@
 #include <QProcess>
 
 #if !defined(Q_OS_WIN)
-#include <QMessageBox>
 #include <csignal>
+#endif
+
+#ifndef OVERTE_HEADLESS
+#if !defined(Q_OS_WIN)
+#include <QMessageBox>
+#endif
 #endif
 
 #include <NumericalConstants.h>
@@ -114,8 +119,9 @@ void runLocalSandbox(QString contentPath, bool autoShutdown, bool noUpdater) {
         qCDebug(networking) << "Sandbox domain-server started";
     } else {
         qCCritical(networking) << "Sandbox domain-server couldn't be started";
-        // safe to use QMessageBox because SandboxUtils is only used by interface
+#ifndef OVERTE_HEADLESS
         QMessageBox::critical(nullptr, "Sandbox Server Error", "The domain-server executable couldn't be started. Overte will continue running without the sandbox server.");
+#endif
         return;
     }
 
@@ -136,9 +142,9 @@ void runLocalSandbox(QString contentPath, bool autoShutdown, bool noUpdater) {
 
         // kill the domain server if we can't start the assignment client
         if (domainPid) { kill(domainPid, SIGINT); }
-
-        // safe to use QMessageBox because SandboxUtils is only used by interface
+#ifndef OVERTE_HEADLESS
         QMessageBox::critical(nullptr, "Sandbox Server Error", "The assignment-client executable couldn't be started. Overte will continue running without the sandbox server.");
+#endif
     }
 #endif
 }

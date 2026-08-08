@@ -16,7 +16,12 @@
 #include <crash-handler/CrashHandler.h>
 
 
-int main(int argc, char* argv[]) {
+#ifdef OVERTE_MULTICALL_APPLET
+int assignmentClientMain(int argc, char* argv[])
+#else
+int main(int argc, char* argv[])
+#endif
+{
     setupHifiApplication(BuildInfo::ASSIGNMENT_CLIENT_NAME);
 
     AssignmentClientApp app(argc, argv);

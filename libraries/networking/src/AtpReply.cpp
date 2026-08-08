@@ -32,7 +32,7 @@ AtpReply::~AtpReply() {
 }
 
 qint64 AtpReply::bytesAvailable() const {
-    return _content.size() - _readOffset + QIODevice::bytesAvailable();
+    return _content.size() - _readOffset;
 }
 
 qint64 AtpReply::readData(char* data, qint64 maxSize) {
@@ -74,11 +74,11 @@ void AtpReply::handleRequestFinish() {
             break;
     }
 
-    open(ReadOnly | Unbuffered);
+    // open not available in compat mode
     setHeader(QNetworkRequest::ContentLengthHeader, QVariant(_content.size()));
 
     if (error() != NoError) {
-        emit errorOccurred(error());
+        emit errorOccurred(QNetworkReply::NetworkError(error()));
     }
 
     setFinished(true);

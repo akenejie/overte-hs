@@ -143,29 +143,20 @@ MiniPromise::Promise AssetClient::queryCacheMetaAsync(const QUrl& url, MiniPromi
             QNetworkCacheMetaData metaData = cache->metaData(url);
             QVariantMap attributes, rawHeaders;
             if (!metaData.isValid()) {
-                deferred->reject("invalid cache entry", {
-                    { "_url", url },
-                    { "isValid", metaData.isValid() },
-                    { "metaDataURL", metaData.url() },
-                });
+                QVariantMap errMap; errMap["_url"]=url; errMap["isValid"]=metaData.isValid(); errMap["metaDataURL"]=metaData.url();
+                deferred->reject("invalid cache entry", errMap);
             } else {
                 auto metaAttributes = metaData.attributes();
-                foreach(QNetworkRequest::Attribute k, metaAttributes.keys()) {
+                for(auto k : metaAttributes.keys()) {
                     attributes[QString::number(k)] = metaAttributes[k];
                 }
                 for (const auto& i : metaData.rawHeaders()) {
                     rawHeaders[i.first] = i.second;
                 }
-                deferred->resolve({
-                    { "_url", url },
-                    { "isValid", metaData.isValid() },
-                    { "url", metaData.url() },
-                    { "expirationDate", metaData.expirationDate() },
-                    { "lastModified", metaData.lastModified().toString().isEmpty() ? QDateTime() : metaData.lastModified() },
-                    { "saveToDisk", metaData.saveToDisk() },
-                    { "attributes", attributes },
-                    { "rawHeaders", rawHeaders },
-                });
+                QVariantMap resultMap; resultMap["_url"]=url; resultMap["isValid"]=metaData.isValid(); resultMap["url"]=metaData.url();
+                resultMap["expirationDate"]=metaData.expirationDate(); resultMap["lastModified"]=metaData.lastModified().toString().isEmpty()?QDateTime():metaData.lastModified();
+                resultMap["saveToDisk"]=metaData.saveToDisk(); resultMap["attributes"]=attributes; resultMap["rawHeaders"]=rawHeaders;
+                deferred->resolve(resultMap);
             }
         } else {
             deferred->reject(CACHE_ERROR_MESSAGE.arg(__FUNCTION__).arg("cache unavailable"));
@@ -187,11 +178,7 @@ MiniPromise::Promise AssetClient::loadFromCacheAsync(const QUrl& url, MiniPromis
             MiniPromise::Promise metaRequest = makePromise(__FUNCTION__);
             queryCacheMetaAsync(url, metaRequest);
             metaRequest->finally([&](QString error, QVariantMap metadata) {
-                QVariantMap result = {
-                    { "url", url },
-                    { "metadata", metadata },
-                    { "data", QByteArray() },
-                };
+                QVariantMap result; result["url"]=url; result["metadata"]=metadata; result["data"]=QByteArray();
                 if (!error.isEmpty()) {
                     deferred->reject(error, result);
                     return;
@@ -217,7 +204,7 @@ namespace {
     QDateTime parseHttpDate(const QString& dateString) {
         QDateTime dt = QDateTime::fromString(dateString.left(25), "ddd, dd MMM yyyy HH:mm:ss");
         if (!dt.isValid()) {
-            dt = QDateTime::fromString(dateString, Qt::ISODateWithMs);
+            dt = QDateTime::fromString(dateString, Qt::ISODate);
         }
         if (!dt.isValid()) {
             qDebug() << __FUNCTION__ << "unrecognized date format:" << dateString;
@@ -271,14 +258,10 @@ MiniPromise::Promise AssetClient::saveToCacheAsync(const QUrl& url, const QByteA
             if (ioDevice) {
                 ioDevice->write(data);
                 cache->insert(ioDevice);
-                deferred->resolve({
-                    { "url", url },
-                    { "success", true },
-                    { "metaDataURL", metaData.url() },
-                    { "byteLength", data.size() },
-                    { "expirationDate", metaData.expirationDate() },
-                    { "lastModified", metaData.lastModified().toString().isEmpty() ? QDateTime() : metaData.lastModified() },
-                });
+                QVariantMap resolveMap; resolveMap["url"]=url; resolveMap["success"]=true; resolveMap["metaDataURL"]=metaData.url();
+                resolveMap["byteLength"]=data.size(); resolveMap["expirationDate"]=metaData.expirationDate();
+                resolveMap["lastModified"]=metaData.lastModified().toString().isEmpty()?QDateTime():metaData.lastModified();
+                deferred->resolve(resolveMap);
             } else {
                 auto error = QString("Could not save to disk cache");
                 qCWarning(asset_client) << error;
@@ -299,10 +282,13 @@ void AssetClient::cacheInfoRequest(QObject* reciever, QString slot) {
     }
 
     if (auto* cache = qobject_cast<QNetworkDiskCache*>(NetworkAccessManager::getInstance().cache())) {
+        QString cacheDir = cache->cacheDirectory();
+        qint64 cacheSize = cache->cacheSize();
+        qint64 maxCacheSize = cache->maximumCacheSize();
         QMetaObject::invokeMethod(reciever, slot.toStdString().data(), Qt::QueuedConnection,
-                                  Q_ARG(QString, cache->cacheDirectory()),
-                                  Q_ARG(qint64, cache->cacheSize()),
-                                  Q_ARG(qint64, cache->maximumCacheSize()));
+                                  Q_ARG(QString, cacheDir),
+                                  Q_ARG(qint64, cacheSize),
+                                  Q_ARG(qint64, maxCacheSize));
     } else {
         qCWarning(asset_client) << "No disk cache to get info from.";
     }

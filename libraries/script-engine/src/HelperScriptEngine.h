@@ -36,6 +36,9 @@ public:
     template <typename F>
     inline void run(F&& f) {
         std::lock_guard<std::mutex> guard(_scriptEngineLock);
+        if (!_scriptEngine) {
+            return;
+        }
         auto scopeGuard = _scriptEngine->getScopeGuard();
         f();
     }
@@ -45,6 +48,9 @@ public:
         T result;
         {
             std::lock_guard<std::mutex> guard(_scriptEngineLock);
+            if (!_scriptEngine) {
+                return result;
+            }
             result = f();
         }
         return result;
