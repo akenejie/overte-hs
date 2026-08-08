@@ -197,8 +197,8 @@ jobs:
               cd rust-udp && cargo build --release && cd ..
               bash scripts/build-static-deps.sh
               # --output-sync keeps parallel-job output intact so a failing
-              # target's message is never swallowed (QEMU can otherwise die
-              # without printing an error). Serial (-- -j1) also helps when a
+              # targets message is never swallowed (QEMU can otherwise die
+              # without printing an error). Serial -- -j1 helps when a
               # compiler is OOM-killed inside the emulated container.
               cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}" -- --output-sync=target
               install -D -m 0755 build/overte-server/overte-server "/work/dist/${BIN_NAME}"
