@@ -147,14 +147,14 @@ jobs:
             image: i386/debian:bookworm
             platform: linux/386
             bin: linux_386
-            jobs: 4
+            jobs: 2
             rust-host: i686-unknown-linux-gnu
             conan-arch: x86
           - name: linux-arm
             image: arm32v7/ubuntu:24.04
             platform: linux/arm/v7
             bin: linux_arm
-            jobs: 4
+            jobs: 2
             rust-host: armv7-unknown-linux-gnueabihf
             conan-arch: armv7
 
@@ -196,7 +196,11 @@ jobs:
               . "$HOME/.cargo/env"
               cd rust-udp && cargo build --release && cd ..
               bash scripts/build-static-deps.sh
-              cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}"
+              # --output-sync keeps parallel-job output intact so a failing
+              # target's message is never swallowed (QEMU can otherwise die
+              # without printing an error). Serial (-- -j1) also helps when a
+              # compiler is OOM-killed inside the emulated container.
+              cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}" -- --output-sync=target
               install -D -m 0755 build/overte-server/overte-server "/work/dist/${BIN_NAME}"
             '
 

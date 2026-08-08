@@ -29,7 +29,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#if defined(__linux__)
 #include <sys/prctl.h>
+#endif
 #include <unistd.h>
 
 // Applet entry points (renamed from `main` by OVERTE_MULTICALL_APPLET)
@@ -134,8 +136,10 @@ int runChildren(std::vector<ServerSpec>& servers) {
             return 1;
         }
         if (pid == 0) {
-            // child: die if the supervisor dies
+            // child: die if the supervisor dies (Linux-only API)
+            #if defined(__linux__)
             ::prctl(PR_SET_PDEATHSIG, SIGTERM);
+            #endif
 
             // keep argv[0] as the program name, then applet args
             std::vector<char*> argvPtrs;
