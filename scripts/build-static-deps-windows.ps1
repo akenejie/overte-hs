@@ -100,18 +100,29 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         Pop-Location
     }
 
-    # jom: parallel nmake. Fall back to nmake if the download fails.
+    # jom: parallel nmake (essential - a serial nmake Qt build can take 4h+ on
+    # a 2-core CI runner). Retry the download a few times; only fall back to
+    # serial nmake as a last resort, with a loud warning.
     $jom = Join-Path $toolsDir "jom.exe"
     if (-not (Test-Path $jom)) {
-        try {
-            $jomZip = Join-Path $work "jom.zip"
-            curl.exe -sL -o $jomZip "https://download.qt.io/official_releases/jom/jom_1_1_4.zip"
-            tar -xf $jomZip -C $toolsDir
-        } catch {
-            Write-Warning "jom download failed; using single-threaded nmake."
+        $jomZip = Join-Path $work "jom.zip"
+        $ok = $false
+        foreach ($try in 1..3) {
+            try {
+                curl.exe -sSL --retry 3 -o $jomZip "https://download.qt.io/official_releases/jom/jom_1_1_4.zip"
+                tar -xf $jomZip -C $toolsDir
+                if (Test-Path $jom) { $ok = $true; break }
+            } catch {
+                Write-Warning "jom download attempt $try failed: $_"
+                Start-Sleep -Seconds 5
+            }
+        }
+        if (-not $ok) {
+            Write-Warning "jom unavailable; building Qt serially with nmake (this will be very slow)."
         }
     }
     $make = if (Test-Path $jom) { "jom" } else { "nmake" }
+    Write-Host "==> Qt build driver: $make"
 
     Push-Location (Join-Path $work $QtDir)
     try {

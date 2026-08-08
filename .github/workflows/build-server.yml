@@ -196,11 +196,14 @@ jobs:
               . "$HOME/.cargo/env"
               cd rust-udp && cargo build --release && cd ..
               bash scripts/build-static-deps.sh
-              # --output-sync keeps parallel-job output intact so a failing
-              # targets message is never swallowed (QEMU can otherwise die
-              # without printing an error). Serial -- -j1 helps when a
-              # compiler is OOM-killed inside the emulated container.
-              cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}" -- --output-sync=target
+              # Output-sync keeps a failing target message intact on QEMU,
+              # where a parallel job can otherwise die silently. On failure,
+              # dump the build log tail for the real error text.
+              if ! cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}" -- --output-sync=target > /work/build.log 2>&1; then
+                echo "==> BUILD FAILED, last 100 log lines:"
+                tail -100 /work/build.log
+                exit 1
+              fi
               install -D -m 0755 build/overte-server/overte-server "/work/dist/${BIN_NAME}"
             '
 
@@ -266,7 +269,7 @@ jobs:
       - name: Build static Qt/oneTBB + conan + configure (MSVC)
         shell: pwsh
         run: |
-          & powershell -ExecutionPolicy Bypass -File scripts/build-static-deps-windows.ps1
+          & powershell -ExecutionPolicy Bypass -File scripts/build-static-deps-windows.ps1 -Jobs 4
 
       - name: Build overte-server
         shell: pwsh
