@@ -27,7 +27,7 @@ set(CMAKE_AUTORCC ON)
 # set our OS X deployment target
 if (APPLE)
     # Needs to be set before the first project() call.
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Specifies the minimum version of the target platform (e.g. macOS or iOS) on which the target binaries are to be deployed.")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Specifies the minimum version of the target platform (e.g. macOS or iOS) on which the target binaries are to be deployed.")
 endif()
 
 

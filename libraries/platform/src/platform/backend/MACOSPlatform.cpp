@@ -17,7 +17,9 @@
 
 #ifdef Q_OS_MAC
 #include <unistd.h>
+#if defined(__x86_64__) || defined(__i386__)
 #include <cpuid.h>
+#endif
 #include <sys/sysctl.h>
 
 #include <sstream>

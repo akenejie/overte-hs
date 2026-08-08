@@ -189,7 +189,11 @@ void packBlendshapeOffsets_AVX2(float (*unpacked)[9], uint32_t (*packed)[4], int
         __m256 tx = _mm256_permute2f128_ps(s2, s6, 0x31);
         __m256 ty = _mm256_permute2f128_ps(s3, s7, 0x31);
 
-        __m256i loadmask = _mm256_cvtepi8_epi32(_mm_cvtsi64_si128(0xffffffffffffffffULL >> (64 - 8 * rem)));
+        // _mm_cvtsi64_si128 is unavailable on 32-bit x86 (it needs a 64-bit
+        // GPR); load low 64 bits from a 128-bit slot for portability.
+        union { unsigned long long u64; __m128i m128; } _mask_tmp;
+        _mask_tmp.u64 = 0xffffffffffffffffULL >> (64 - 8 * rem);
+        __m256i loadmask = _mm256_cvtepi8_epi32(_mm_loadl_epi64(&_mask_tmp.m128));
         __m256 tz = _mm256_mask_i32gather_ps(_mm256_setzero_ps(), unpacked[i+0], _mm256_setr_epi32(8,17,26,35,44,53,62,71), 
                                              _mm256_castsi256_ps(loadmask), sizeof(float));
         // abs(pos)
