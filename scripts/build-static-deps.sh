@@ -154,6 +154,8 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$TBB_PREFIX" ]; then
     WORK="$(mktemp -d /tmp/overte-tbb.XXXXXX)"
     trap 'rm -rf "$WORK"' EXIT
 
+    # oneTBB cmake_minimum_required is 3.1; CMake on newer runners (e.g. the
+    # macOS image) removed compatibility for projects below 3.5, so lift it.
     echo "==> building static oneTBB $TBB_VER (first run)..."
     cd "$WORK"
     curl -sL -o oneTBB.tar.gz \
@@ -166,6 +168,7 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$TBB_PREFIX" ]; then
         -DTBB_TEST=OFF -DTBB_STRICT=OFF \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DCMAKE_CXX_STANDARD=17 \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_INSTALL_PREFIX="$TBB_PREFIX"
     cmake --build build -j"${OVERTE_BUILD_JOBS:-$JOBS}"
     cmake --install build

@@ -172,6 +172,7 @@ if (-not $SkipDeps -and -not (Test-Path $tbbPrefix)) {
             -DTBB_TEST=OFF -DTBB_STRICT=OFF `
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON `
             -DCMAKE_CXX_STANDARD=17 `
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
             "-DCMAKE_INSTALL_PREFIX=$tbbPrefix"
         cmake --build build --config Release
         cmake --install build --config Release
