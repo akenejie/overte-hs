@@ -4,7 +4,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (NOT "${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
-  message( FATAL_ERROR "Only 64 bit builds supported." )
+  if (NOT OVERTE_HEADLESS)
+    message( FATAL_ERROR "Only 64 bit builds supported." )
+  else()
+    message( STATUS "32-bit headless build (pointers are ${CMAKE_SIZEOF_VOID_P} bytes)." )
+  endif()
 endif()
 
 if (WIN32)
