@@ -109,7 +109,9 @@ jobs:
         run: bash scripts/build-static-deps.sh
 
       - name: Build overte-server
-        run: cmake --build build --target overte-server -j"$(nproc)"
+        run: |
+          if [ "$(uname -s)" = "Darwin" ]; then JOBS="$(sysctl -n hw.ncpu)"; else JOBS="$(nproc)"; fi
+          cmake --build build --target overte-server -j"$JOBS"
 
       - name: Verify binary
         run: |

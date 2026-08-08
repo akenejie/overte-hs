@@ -37,6 +37,13 @@ QT_PREFIX="$DEPS_DIR/qt5-static"
 TBB_PREFIX="$DEPS_DIR/onetbb-static"
 TBB_DIR="$TBB_PREFIX/lib/cmake/TBB"
 
+# nproc is GNU-only; macOS provides sysctl instead.
+if [ "$PLATFORM" = "macos" ]; then
+    JOBS="$(sysctl -n hw.ncpu)"
+else
+    JOBS="$(nproc)"
+fi
+
 CONAN_PROFILE_ARGS=(
     -pr:h=default -pr:b=default
     -o headless=True -o qt_source=system
@@ -97,10 +104,19 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$QT_PREFIX" ]; then
     # QtGui (QPainter/QImage) is required by the headless server even though no
     # windowing is used; freetype/harfbuzz are built from Qt's bundled copies so
     # no system graphics dependencies are needed. OpenGL/X11/SSL are disabled.
+    if [ "$PLATFORM" = "macos" ]; then
+        # Qt 5.15's bundled libpng includes the legacy <fp.h>, which was
+        # removed from the macOS SDK; use <math.h>, as in libpng 1.6.41.
+        if grep -q 'include <fp\.h>' src/3rdparty/libpng/pngpriv.h; then
+            perl -pi -e 's{\#\s*include <fp\.h>}{#          include <math.h>}' \
+                src/3rdparty/libpng/pngpriv.h
+        fi
+    fi
     QT_CONFIGURE_ARGS=(
         -prefix / -opensource -confirm-license -static -release
         -no-openssl -no-dbus -no-glib -no-icu -no-pch
         -no-xcb -no-opengl -no-xkbcommon
+        -qt-libpng -qt-libjpeg -qt-harfbuzz
         --pcre=qt --no-feature-zstd
         -nomake examples -nomake tests -nomake tools
         -no-feature-concurrent -no-feature-sql
@@ -111,17 +127,19 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$QT_PREFIX" ]; then
         QT_CONFIGURE_ARGS+=( -no-framework )
     fi
     ./configure "${QT_CONFIGURE_ARGS[@]}"
-    make -j"${OVERTE_BUILD_JOBS:-$(nproc)}"
+    make -j"${OVERTE_BUILD_JOBS:-$JOBS}"
     make install INSTALL_ROOT="$QT_PREFIX"
 
     # Fix the .prl files produced by a "-prefix /" build:
-    #  - the QT_INSTALL_LIBS property is emitted doubled ($$[QT_INSTALL_LIBS]$$[QT_INSTALL_LIBS]),
+    #  - the QT_INSTALL_LIBS property is expanded doubled ($$[QT_INSTALL_LIBS]$$[QT_INSTALL_LIBS]),
     #    which CMake expands to "<prefix>/lib/<prefix>/lib/..."; collapse it to one placeholder
-    #  - the Qt library names lose their "lib" prefix; restore it
+    #  - the Qt library names (Qt5*, plus the bundled 3rd-party ones such
+    #    as qtlibpng/qtharfbuzz/qtlibjpeg/qtpcre2) lose their "lib" prefix;
+    #    restore it so the installed libqtlibpng.a etc. are found
     #  - point any -lpcre2-16 at the bundled static libqtpcre2.a
-    find "$QT_PREFIX" -name "*.prl" -exec perl -i -pe '
+    find "$QT_PREFIX" -name "*.prl" -exec perl -pi -e '
         s/\$\$\[QT_INSTALL_LIBS\]\$\$\[QT_INSTALL_LIBS\]/\$\$[QT_INSTALL_LIBS]/g;
-        s/\$\$\[QT_INSTALL_LIBS\](Qt5[A-Za-z]*|qtpcre2)\.a/\$\$[QT_INSTALL_LIBS]lib$1.a/g;
+        s/\$\$\[QT_INSTALL_LIBS\](?!lib)([A-Za-z0-9]+)\.a/\$\$[QT_INSTALL_LIBS]lib$1.a/g;
         s/-lpcre2-16/\$\$[QT_INSTALL_LIBS]libqtpcre2.a/g
     ' {} +
     echo "==> static Qt installed to $QT_PREFIX"
@@ -149,7 +167,7 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$TBB_PREFIX" ]; then
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DCMAKE_CXX_STANDARD=17 \
         -DCMAKE_INSTALL_PREFIX="$TBB_PREFIX"
-    cmake --build build -j"${OVERTE_BUILD_JOBS:-$(nproc)}"
+    cmake --build build -j"${OVERTE_BUILD_JOBS:-$JOBS}"
     cmake --install build
     echo "==> static oneTBB installed to $TBB_PREFIX"
 else

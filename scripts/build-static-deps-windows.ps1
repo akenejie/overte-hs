@@ -124,6 +124,7 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
             -platform win32-msvc `
             -no-openssl -no-dbus -no-glib -no-icu -no-pch -no-opengl `
             -no-feature-zstd -no-feature-concurrent -no-feature-sql `
+            -qt-libpng -qt-libjpeg -qt-harfbuzz `
             --pcre=qt `
             -nomake examples -nomake tests -nomake tools
         if ($LASTEXITCODE -ne 0) { throw "Qt configure failed (exit $LASTEXITCODE)" }
