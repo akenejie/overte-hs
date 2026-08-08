@@ -149,12 +149,14 @@ jobs:
             bin: linux_386
             jobs: 4
             rust-host: i686-unknown-linux-gnu
+            conan-arch: x86
           - name: linux-arm
             image: arm32v7/ubuntu:24.04
             platform: linux/arm/v7
             bin: linux_arm
             jobs: 4
             rust-host: armv7-unknown-linux-gnueabihf
+            conan-arch: armv7
 
     steps:
       - name: Checkout
@@ -180,6 +182,7 @@ jobs:
             -e OVERTE_BUILD_JOBS="${{ matrix.jobs }}" \
             -e BIN_NAME="${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}" \
             -e RUST_DEFAULT_HOST="${{ matrix.rust-host }}" \
+            -e CONAN_ARCH="${{ matrix.conan-arch }}" \
             "${{ matrix.image }}" \
             bash -c '
               set -euo pipefail

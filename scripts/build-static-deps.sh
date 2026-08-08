@@ -180,6 +180,13 @@ fi
 # --- 3. Conan toolchain -----------------------------------------------------
 echo "==> running conan install (toolchain into $BUILD_DIR/generators)..."
 conan profile detect --force >/dev/null 2>&1 || true
+# QEMU-emulated containers (i386/armv7) may report the host kernel arch
+# (e.g. x86_64) to profile detect, which would bake the wrong -m flag into
+# the toolchain. When CONAN_ARCH is set (per CI matrix), override the detect.
+if [ -n "${CONAN_ARCH:-}" ]; then
+    echo "==> overriding conan arch to $CONAN_ARCH"
+    conan profile update settings.arch="$CONAN_ARCH" default >/dev/null 2>&1 || true
+fi
 ( cd "$PROJECT_ROOT" && conan install . "${CONAN_PROFILE_ARGS[@]}" --build=missing --output-folder="$BUILD_DIR" )
 
 # --- 4. CMake configure -----------------------------------------------------
