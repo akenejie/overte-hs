@@ -158,6 +158,7 @@ fi
 
 # --- 3. Conan toolchain -----------------------------------------------------
 echo "==> running conan install (toolchain into $BUILD_DIR/generators)..."
+conan profile detect --force >/dev/null 2>&1 || true
 ( cd "$PROJECT_ROOT" && conan install . "${CONAN_PROFILE_ARGS[@]}" --build=missing --output-folder="$BUILD_DIR" )
 
 # --- 4. CMake configure -----------------------------------------------------

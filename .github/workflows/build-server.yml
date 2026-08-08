@@ -10,7 +10,7 @@
 # Build targets (binary name -> overte-hs_v0.1.0_<os>_<arch>):
 #   native    linux-amd64 (ubuntu-24.04),        linux-arm64 (ubuntu-24.04-arm),
 #             darwin-amd64 (macos-15-intel),     darwin-arm64 (macos-15)
-#   emulated  linux-386 (i386/ubuntu + QEMU),    linux-arm (arm32v7 + QEMU)
+#   emulated  linux-386 (i386/debian + QEMU),    linux-arm (arm32v7 + QEMU)
 #   windows   windows-amd64 (windows-2022, MSVC)
 #             (windows-arm64 excluded: needs an MSVC arm64 static Qt, unstarted)
 #
@@ -142,7 +142,7 @@ jobs:
       matrix:
         include:
           - name: linux-386
-            image: i386/ubuntu:24.04
+            image: i386/debian:bookworm
             platform: linux/386
             bin: linux_386
             jobs: 4

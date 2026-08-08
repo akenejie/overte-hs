@@ -184,6 +184,7 @@ if (-not $SkipDeps -and -not (Test-Path $tbbPrefix)) {
 
 # --- 3. Conan toolchain ------------------------------------------------------
 Write-Host "==> running conan install (toolchain into $buildDir/generators)..."
+conan profile detect --force 2>$null | Out-Null
 conan install . -pr:h=default -pr:b=default -o headless=True -o qt_source=system `
     -o openssl*:shared=False --build=missing --output-folder="$buildDir"
 if ($LASTEXITCODE -ne 0) { throw "conan install failed (exit $LASTEXITCODE)" }
