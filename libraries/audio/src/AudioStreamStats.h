@@ -14,6 +14,17 @@
 
 #include "SequenceNumberStats.h"
 
+// This struct is copied verbatim onto messages (see NLPacket::writePrimitive in
+// AudioIOStats.cpp), so its in-memory layout must be identical on 32-bit and
+// 64-bit builds. The quint64 members are naturally 8-byte aligned on 64-bit but
+// only 4-byte aligned on 32-bit, which would offset every later member. Force
+// the same 8-byte alignment everywhere so hosts of either bitness interoperate.
+#if defined(_MSC_VER)
+#define HIFI_AUDIO_STREAM_8BYTE_ALIGN __declspec(align(8))
+#else
+#define HIFI_AUDIO_STREAM_8BYTE_ALIGN __attribute__((aligned(8)))
+#endif
+
 class AudioStreamStats {
 public:
     // Intermediate packets should have no flag set
@@ -46,11 +57,11 @@ public:
     qint32 _streamType;
     QUuid _streamIdentifier;
 
-    quint64 _timeGapMin;
-    quint64 _timeGapMax;
+    HIFI_AUDIO_STREAM_8BYTE_ALIGN quint64 _timeGapMin;
+    HIFI_AUDIO_STREAM_8BYTE_ALIGN quint64 _timeGapMax;
     float _timeGapAverage;
-    quint64 _timeGapWindowMin;
-    quint64 _timeGapWindowMax;
+    HIFI_AUDIO_STREAM_8BYTE_ALIGN quint64 _timeGapWindowMin;
+    HIFI_AUDIO_STREAM_8BYTE_ALIGN quint64 _timeGapWindowMax;
     float _timeGapWindowAverage;
 
     quint32 _framesAvailable;
@@ -66,6 +77,8 @@ public:
     PacketStreamStats _packetStreamWindowStats;
 };
 
-static_assert(sizeof(AudioStreamStats) == 152, "AudioStreamStats size isn't right");
+static_assert(sizeof(AudioStreamStats) == 152,
+              "AudioStreamStats size isn't right (struct is sent verbatim over the wire; "
+              "it must stay 152 bytes on both 32-bit and 64-bit builds)");
 
 #endif  // hifi_AudioStreamStats_h
