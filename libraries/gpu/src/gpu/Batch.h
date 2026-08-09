@@ -1130,9 +1130,11 @@ public:
     class Param {
     public:
         union {
-#if (QT_POINTER_SIZE == 8)
+            // Always expose _size (also on 32-bit, where size_t aliases
+            // unsigned int): FrameWriter::writeCommand reads it unconditionally.
+            // The Param(size_t) constructor below stays 64-bit-only because on
+            // 32-bit it would be an ambiguous duplicate of Param(uint32).
             size_t _size;
-#endif
             int32 _int;
             uint32 _uint;
             float _float;
