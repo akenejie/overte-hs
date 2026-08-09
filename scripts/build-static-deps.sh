@@ -95,8 +95,30 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$QT_PREFIX" ]; then
 
     echo "==> building static Qt $QT_VER (first run; takes a while)..."
     cd "$WORK"
-    curl -sL -o "$QT_TAR" \
+    # Try official mirrors first: download.qt.io can stall for hours from
+    # GitHub Actions runners. QTSRC_URL can override the whole URL; otherwise
+    # try a mirror list in order (berkeley OCF is fastest from US runners).
+    QTSRC_URL="${QTSRC_URL:-https://mirrors.ocf.berkeley.edu/qt/archive/qt/5.15/$QT_VER/submodules/$QT_TAR}"
+    QT_URLS=(
+        "$QTSRC_URL"
         "https://download.qt.io/archive/qt/5.15/$QT_VER/submodules/$QT_TAR"
+        "https://mirrors.tuna.tsinghua.edu.cn/qt/archive/qt/5.15/$QT_VER/submodules/$QT_TAR"
+    )
+    QT_DOWNLOADED=0
+    for url in "${QT_URLS[@]}"; do
+        echo "==> downloading Qt from $url"
+        if curl -sfSL --connect-timeout 20 --max-time 600 --retry 2 -o "$QT_TAR" "$url"; then
+            if [ "$(stat -c%s "$QT_TAR" 2>/dev/null || echo 0)" -gt 10000000 ]; then
+                QT_DOWNLOADED=1
+                break
+            fi
+            echo "==> $url returned a too-small file; trying next mirror"
+        fi
+    done
+    if [ "$QT_DOWNLOADED" -ne 1 ]; then
+        echo "ERROR: could not download Qt sources from any mirror" >&2
+        exit 1
+    fi
     tar xf "$QT_TAR"
     cd "$QT_SRC"
     # -prefix / bakes the neutral "qt_prfxpath=/" into QtCore (no machine path);

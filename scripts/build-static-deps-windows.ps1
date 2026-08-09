@@ -93,23 +93,32 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
     Write-Host "==> building static Qt $QtVer for MSVC (first run; takes a while)..."
     Push-Location $work
     try {
-        # The Qt source tarball lives on download.qt.io, which is often very
-        # slow (or stalls) from GitHub Actions runners. Enforce connect and
-        # speed timeouts and retry, otherwise a stalled download looks like an
-        # endless "building static Qt" step.
+        # The Qt source tarball on download.qt.io is often very slow (or stalls)
+        # for hours from GitHub Actions runners. Use official mirrors first
+        # (berkeley OCF is fastest from US runners), falling back to the other
+        # mirrors; enforce timeouts so a stall aborts quickly instead of hanging.
+        $QtUrls = @(
+            "https://mirrors.ocf.berkeley.edu/qt/archive/qt/5.15/$QtVer/submodules/$QtTar"
+            "https://download.qt.io/archive/qt/5.15/$QtVer/submodules/$QtTar"
+            "https://mirrors.tuna.tsinghua.edu.cn/qt/archive/qt/5.15/$QtVer/submodules/$QtTar"
+        )
         $ok = $false
-        foreach ($try in 1..3) {
-            try {
-                curl.exe -sSL --connect-timeout 20 --max-time 300 --retry 2 -o $QtTar `
-                    "https://download.qt.io/archive/qt/5.15/$QtVer/submodules/$QtTar"
-                if ((Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) { $ok = $true; break }
-                Write-Warning "Qt source download too small/short (attempt $try); retrying."
-            } catch {
-                Write-Warning "Qt source download attempt $try failed: $_"
+        foreach ($url in $QtUrls) {
+            Write-Host "==> downloading Qt from $url"
+            foreach ($try in 1..2) {
+                try {
+                    curl.exe -sfSL --connect-timeout 20 --max-time 600 --retry 1 -o $QtTar $url
+                    $okDl = $lastExitCode -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)
+                    if ($okDl) { $ok = $true; break }
+                    Write-Warning "Qt source download too small/short (attempt $try); trying next."
+                } catch {
+                    Write-Warning "Qt source download attempt $try failed for $url : $_"
+                }
+                Start-Sleep -Seconds 5
             }
-            Start-Sleep -Seconds 5
+            if ($ok) { break }
         }
-        if (-not $ok) { throw "failed to download Qt sources after 3 attempts" }
+        if (-not $ok) { throw "failed to download Qt sources from all mirrors" }
         tar -xf $QtTar   # bsdtar on Windows handles .tar.xz
         if (-not (Test-Path $QtDir)) { throw "failed to extract Qt sources" }
     } finally {

@@ -15,6 +15,8 @@
 #define hifi_ResourceCache_h
 
 #include <atomic>
+#include <climits>
+#include <cstdint>
 #include <mutex>
 #include <math.h>
 
@@ -35,7 +37,14 @@
 
 #include "ResourceManager.h"
 
+// size_t aliases unsigned int on 32-bit builds, where RegisteredMetaTypes.h
+// already declares Q_DECLARE_METATYPE(unsigned int); declaring it again here
+// (as a QMetaTypeId<size_t> specialization) would be a redefinition. Skip it
+// on 32-bit; only declare the 64-bit size_t metatype.
+#include <cstdint>
+#if SIZE_MAX != UINT_MAX
 Q_DECLARE_METATYPE(size_t)
+#endif
 
 class QNetworkReply;
 class QTimer;
