@@ -96,7 +96,22 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         # The Qt source tarball on download.qt.io is often very slow (or stalls)
         # for hours from GitHub Actions runners. Use official mirrors first
         # (berkeley OCF is fastest from US runners), falling back to the other
-        # mirrors; enforce timeouts so a stall aborts quickly instead of hanging.
+        # mirrors. curl's own --max-time does not always fire on Windows when
+        # the process is stuck inside the OS network stack/proxy, so we also
+        # watchdog the curl process itself and kill it if it overruns.
+        function Invoke-CurlWithTimeout {
+            param([string]$Url, [string]$OutFile, [int]$TimeoutSec)
+            Remove-Item $OutFile -ErrorAction SilentlyContinue
+            $curlArgs = "-sfSL --connect-timeout 20 --max-time $TimeoutSec --retry 0 -o `"$OutFile`" `"$Url`""
+            $p = Start-Process -FilePath "curl.exe" -ArgumentList $curlArgs -NoNewWindow -PassThru
+            if (-not $p.WaitForExit(($TimeoutSec + 30) * 1000)) {
+                Write-Warning "curl timed out after ${TimeoutSec}s (killing): $Url"
+                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+                return $false
+            }
+            return ($p.ExitCode -eq 0)
+        }
+
         $QtUrls = @(
             "https://mirrors.ocf.berkeley.edu/qt/archive/qt/5.15/$QtVer/submodules/$QtTar"
             "https://download.qt.io/archive/qt/5.15/$QtVer/submodules/$QtTar"
@@ -106,14 +121,10 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         foreach ($url in $QtUrls) {
             Write-Host "==> downloading Qt from $url"
             foreach ($try in 1..2) {
-                try {
-                    curl.exe -sfSL --connect-timeout 20 --max-time 600 --retry 1 -o $QtTar $url
-                    $okDl = $lastExitCode -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)
-                    if ($okDl) { $ok = $true; break }
-                    Write-Warning "Qt source download too small/short (attempt $try); trying next."
-                } catch {
-                    Write-Warning "Qt source download attempt $try failed for $url : $_"
+                if (Invoke-CurlWithTimeout -Url $url -OutFile $QtTar -TimeoutSec 600) {
+                    if ((Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) { $ok = $true; break }
                 }
+                Write-Warning "Qt source download attempt $try failed for $url; trying next."
                 Start-Sleep -Seconds 5
             }
             if ($ok) { break }
