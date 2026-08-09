@@ -93,7 +93,23 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
     Write-Host "==> building static Qt $QtVer for MSVC (first run; takes a while)..."
     Push-Location $work
     try {
-        curl.exe -sL -o $QtTar "https://download.qt.io/archive/qt/5.15/$QtVer/submodules/$QtTar"
+        # The Qt source tarball lives on download.qt.io, which is often very
+        # slow (or stalls) from GitHub Actions runners. Enforce connect and
+        # speed timeouts and retry, otherwise a stalled download looks like an
+        # endless "building static Qt" step.
+        $ok = $false
+        foreach ($try in 1..3) {
+            try {
+                curl.exe -sSL --connect-timeout 20 --max-time 300 --retry 2 -o $QtTar `
+                    "https://download.qt.io/archive/qt/5.15/$QtVer/submodules/$QtTar"
+                if ((Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) { $ok = $true; break }
+                Write-Warning "Qt source download too small/short (attempt $try); retrying."
+            } catch {
+                Write-Warning "Qt source download attempt $try failed: $_"
+            }
+            Start-Sleep -Seconds 5
+        }
+        if (-not $ok) { throw "failed to download Qt sources after 3 attempts" }
         tar -xf $QtTar   # bsdtar on Windows handles .tar.xz
         if (-not (Test-Path $QtDir)) { throw "failed to extract Qt sources" }
     } finally {

@@ -147,14 +147,14 @@ jobs:
             image: i386/debian:bookworm
             platform: linux/386
             bin: linux_386
-            jobs: 2
+            jobs: 1
             rust-host: i686-unknown-linux-gnu
             conan-arch: x86
           - name: linux-arm
             image: arm32v7/ubuntu:24.04
             platform: linux/arm/v7
             bin: linux_arm
-            jobs: 2
+            jobs: 1
             rust-host: armv7-unknown-linux-gnueabihf
             conan-arch: armv7
 
@@ -196,13 +196,15 @@ jobs:
               . "$HOME/.cargo/env"
               cd rust-udp && cargo build --release && cd ..
               bash scripts/build-static-deps.sh
-              # Write the build log directly to a file in real time (compiler
-              # output reaches the file even if a child is OOM-killed), and on
-              # failure dump the tail. --output-sync is avoided: it buffers
-              # output in make and can drop the whole target on a hard kill.
+              # Write the build log directly to a file in real time so compiler output
+              # survives a hard kill. On failure, grep the WHOLE log for error
+              # lines - with parallel make the failing target can be many lines
+              # above the end of the log, so a plain tail misses it.
               if ! cmake --build build --target overte-server -j"${OVERTE_BUILD_JOBS}" > /work/build.log 2>&1; then
-                echo "==> BUILD FAILED, last 100 log lines:"
-                tail -100 /work/build.log
+                echo "==> BUILD FAILED - error context:"
+                grep -n -iE "error:|error \d|ld:|undefined reference|cannot find|not found|fatal|assert|Killed|No space|out of memory" /work/build.log | head -40
+                echo "==> last 40 log lines:"
+                tail -40 /work/build.log
                 exit 1
               fi
               install -D -m 0755 build/overte-server/overte-server "/work/dist/${BIN_NAME}"
