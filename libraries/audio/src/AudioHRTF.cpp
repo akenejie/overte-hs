@@ -157,6 +157,16 @@ static const float lowpassTable[NLOWPASS+1][5] = {  // { b0, b1, b2, a1, a2 }
 
 #include <emmintrin.h>
 
+// GCC/Clang do not enable SSE by default when targeting 32-bit x86 (i386),
+// which makes the always_inline intrinsics below fail to compile. Pin this
+// section to SSE2 so it builds on i386 too. The AVX2/AVX512 functions live in
+// their own files with their own flags and are unaffected. MSVC is skipped
+// because it has no GCC-style target pragma (and enables SSE2 by default).
+#if defined(__GNUC__)
+#pragma GCC push_options
+#pragma GCC target("sse2")
+#endif
+
 // 1 channel input, 4 channel output
 static void FIR_1x4_SSE(float* src, float* dst0, float* dst1, float* dst2, float* dst3, float coef[4][HRTF_TAPS], int numFrames) {
 
@@ -688,6 +698,10 @@ static void interpolate(const float* src0, const float* src1, float* dst, float 
         dst[k] = f0 * src0[k] + f1 * src1[k];
     }
 }
+
+#if defined(__GNUC__)
+#pragma GCC pop_options
+#endif
 
 #endif
 
