@@ -50,14 +50,9 @@
 
 #include <xmmintrin.h>
 // convert float to int using round-to-nearest
-// (function-level target so the always_inline intrinsics compile even when the
-// enclosing TU targets plain i386, where GCC/Clang do not enable SSE by default)
-#if defined(__GNUC__)
-#define HIFI_SSE2_TARGET __attribute__((target("sse2")))
-#else
-#define HIFI_SSE2_TARGET
-#endif
-HIFI_SSE2_TARGET FORCEINLINE static int32_t floatToInt(float x) {
+// (the audio library is compiled with SSE2 on 32-bit x86 via CMakeFlags, so the
+// always_inline intrinsics below always have a matching target at call sites)
+FORCEINLINE static int32_t floatToInt(float x) {
     return _mm_cvt_ss2si(_mm_set_ss(x));
 }
 

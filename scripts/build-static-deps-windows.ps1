@@ -96,31 +96,11 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         # The Qt source tarball on download.qt.io is often very slow (or stalls)
         # for hours from GitHub Actions runners. Use official mirrors first
         # (berkeley OCF is fastest from US runners), falling back to the other
-        # mirrors. curl's own --max-time does not always fire on Windows when
-        # the process is stuck inside the OS network stack/proxy, so we also
-        # watchdog the curl process itself and kill it if it overruns.
-function Invoke-CurlWithTimeout {
-            param([string]$Url, [string]$OutFile, [int]$TimeoutSec, [string]$ErrLog)
-            Remove-Item $OutFile -ErrorAction SilentlyContinue
-            Remove-Item $ErrLog -ErrorAction SilentlyContinue
-            # NOTE: do not use curl -f (it turns HTTP errors into instant nonzero
-            # exit); instead rely on the size check after download. Arguments are
-            # passed as an array so start-Process does not mangle quoting.
-            $curlArgs = @('-sSL', '--connect-timeout', '20', '--max-time', "$TimeoutSec", '-o', $OutFile, $Url)
-            $p = Start-Process -FilePath "curl.exe" -ArgumentList $curlArgs -PassThru -NoNewWindow -RedirectStandardError $ErrLog
-            if (-not $p.WaitForExit(($TimeoutSec + 30) * 1000)) {
-                Write-Warning "curl timed out after ${TimeoutSec}s (killing): $Url"
-                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-                return $false
-            }
-            if ($p.ExitCode -ne 0 -and (Test-Path $ErrLog)) {
-                $errline = (Get-Content $ErrLog -Tail 3) -join ' | '
-                Write-Warning "curl exit=$($p.ExitCode): $errline"
-            }
-            return ($p.ExitCode -eq 0)
-        }
+        # mirrors. Use Invoke-WebRequest (native .NET HttpClient) so the timeout
+        # is enforced reliably and failures produce a clear message - curl.exe
+        # via Start-Process gets a null exit code here and is untrustworthy.
+        $ProgressPreference = 'SilentlyContinue'  # large download, avoid progress overhead
 
-        $curlLog = Join-Path $work "qt-curl-errors.log"
         $QtUrls = @(
             "https://mirrors.ocf.berkeley.edu/qt/archive/qt/5.15/$QtVer/submodules/$QtTar"
             "https://download.qt.io/archive/qt/5.15/$QtVer/submodules/$QtTar"
@@ -130,10 +110,13 @@ function Invoke-CurlWithTimeout {
         foreach ($url in $QtUrls) {
             Write-Host "==> downloading Qt from $url"
             foreach ($try in 1..2) {
-                if (Invoke-CurlWithTimeout -Url $url -OutFile $QtTar -TimeoutSec 600 -ErrLog $curlLog) {
+                try {
+                    Remove-Item $QtTar -ErrorAction SilentlyContinue
+                    Invoke-WebRequest -Uri $url -OutFile $QtTar -TimeoutSec 600 -UseBasicParsing
                     if ((Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) { $ok = $true; break }
+                } catch {
+                    Write-Warning "Qt source download attempt $try failed for $url : $($_.Exception.Message)"
                 }
-                Write-Warning "Qt source download attempt $try failed for $url; trying next."
                 Start-Sleep -Seconds 5
             }
             if ($ok) { break }
