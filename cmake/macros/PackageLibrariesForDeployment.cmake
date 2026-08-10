@@ -11,7 +11,7 @@
 #
 
 macro(PACKAGE_LIBRARIES_FOR_DEPLOYMENT)
-    if (WIN32)
+    if (WIN32 AND NOT OVERTE_HEADLESS)
         set(PLUGIN_PATH "plugins")
 
         get_target_property(Qt_Core_Location Qt5::Core LOCATION)
