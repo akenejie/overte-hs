@@ -72,9 +72,12 @@ static inline float fastExp2f(float x) {
 }
 
 //
-// on x86 architecture, assume that SSE2 is present
+// Use the SSE2 sqrtss intrinsic only when the compiler actually has SSE2
+// enabled (x86-64 always; i386 only when built with -msse2). i386 without
+// SSE2 falls back to sqrtf, which is numerically identical. GLM uses
+// GLM_ARCH_SSE2_BIT for the same purpose.
 //
-#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
+#if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86) && (_M_IX86_FP >= 2))
 
 #include <xmmintrin.h>
 // inline sqrtss, without requiring /fp:fast
