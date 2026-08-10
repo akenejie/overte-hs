@@ -112,14 +112,24 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         foreach ($url in $QtUrls) {
             Write-Host "==> downloading Qt from $url"
             foreach ($try in 1..3) {
-                curl.exe -fL --connect-timeout 20 --max-time 600 -C - `
+                # The script runs with $ErrorActionPreference='Stop'; PS turns
+                # native stderr into ErrorRecords and (7.3+) nonzero exits into
+                # errors, so a plain call throws on curl's progress output.
+                # -s silences the progress meter, -S keeps error messages, and
+                # we relax EAP to 'Continue' only around the call so the exit
+                # code is checked by us, not thrown as a terminating error.
+                $oldEap = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                curl.exe -fLsS --connect-timeout 20 --max-time 600 -C - `
                     --speed-limit 1024 --speed-time 30 --retry 2 --retry-delay 5 `
                     -o $QtTar $url 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) {
+                $rc = $LASTEXITCODE
+                $ErrorActionPreference = $oldEap
+                if ($rc -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) {
                     $ok = $true
                     break
                 }
-                Write-Warning "Qt source download attempt $try failed for $url (curl exit $LASTEXITCODE)"
+                Write-Warning "Qt source download attempt $try failed for $url (curl exit $rc)"
                 Start-Sleep -Seconds 5
             }
             if ($ok) { break }
