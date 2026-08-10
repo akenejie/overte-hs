@@ -115,14 +115,16 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
                 # The script runs with $ErrorActionPreference='Stop'; PS turns
                 # native stderr into ErrorRecords and (7.3+) nonzero exits into
                 # errors, so a plain call throws on curl's progress output.
-                # -s silences the progress meter, -S keeps error messages, and
-                # we relax EAP to 'Continue' only around the call so the exit
-                # code is checked by us, not thrown as a terminating error.
+                # Drop EAP to 'Continue' around the call only, so the exit code
+                # is checked by us rather than thrown as a terminating error.
+                # curl writes its progress bar to stderr; forward each line to
+                # Write-Host so the download progress is shown on stdout (and
+                # the NativeCommandError records don't hit the error stream).
                 $oldEap = $ErrorActionPreference
                 $ErrorActionPreference = 'Continue'
-                curl.exe -fLsS --connect-timeout 20 --max-time 600 -C - `
+                curl.exe -fL --progress-bar --connect-timeout 20 --max-time 600 -C - `
                     --speed-limit 1024 --speed-time 30 --retry 2 --retry-delay 5 `
-                    -o $QtTar $url 2>&1 | Out-Null
+                    -o $QtTar $url 2>&1 | ForEach-Object { Write-Host $_ }
                 $rc = $LASTEXITCODE
                 $ErrorActionPreference = $oldEap
                 if ($rc -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) {
