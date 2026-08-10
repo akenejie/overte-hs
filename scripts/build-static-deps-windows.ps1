@@ -30,6 +30,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# PowerShell 7.3+ sets $PSNativeCommandUseErrorActionPreference=$true, which
+# turns ANY native stderr output (progress bars, conan diagnostics, compiler
+# chatter) into an error record - combined with $ErrorActionPreference='Stop'
+# it makes well-behaved tools fail the run. conan/curl/nmake print to stderr
+# routinely, so keep the classic behavior: native stderr is inert and we check
+# $LASTEXITCODE for real failures.
+$PSNativeCommandUseErrorActionPreference = $false
+
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $root
 $platformDir = Join-Path $root "deps\win"
@@ -272,7 +280,12 @@ if (-not $SkipDeps -and -not (Test-Path $tbbPrefix)) {
 
 # --- 3. Conan toolchain ------------------------------------------------------
 Write-Host "==> running conan install (toolchain into $buildDir/generators)..."
-conan profile detect --force 2>$null | Out-Null
+    # Do NOT redirect conan's stderr: under Windows PowerShell 5.1 each
+    # redirected stderr line becomes an ErrorRecord which $ErrorActionPreference
+    # 'Stop' escalates to a fatal error. Un-redirected native stderr just shows
+    # in the log; conan's exit code is checked below for real failures.
+    conan profile detect --force
+    if ($LASTEXITCODE -ne 0) { throw "conan profile detect failed (exit $LASTEXITCODE)" }
 conan install . -pr:h=default -pr:b=default -o headless=True -o qt_source=system `
     -o openssl*:shared=False --build=missing --output-folder="$buildDir"
 if ($LASTEXITCODE -ne 0) { throw "conan install failed (exit $LASTEXITCODE)" }
