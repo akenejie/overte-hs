@@ -117,14 +117,17 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
                 # errors, so a plain call throws on curl's progress output.
                 # Drop EAP to 'Continue' around the call only, so the exit code
                 # is checked by us rather than thrown as a terminating error.
-                # curl writes its progress bar to stderr; forward each line to
-                # Write-Host so the download progress is shown on stdout (and
-                # the NativeCommandError records don't hit the error stream).
+                # curl's progress bar goes to stderr, which PowerShell forwards
+                # to the console/CI log as an ErrorRecord - with EAP=Continue
+                # that is non-terminating and shows the live progress.
+                # AVOID "2>&1 | ForEach-Object": the PS native-stderr pipeline is
+                # a known source of hangs with large transfers, so let the bytes
+                # flow straight through to the host instead.
                 $oldEap = $ErrorActionPreference
                 $ErrorActionPreference = 'Continue'
                 curl.exe -fL --progress-bar --connect-timeout 20 --max-time 600 -C - `
                     --speed-limit 1024 --speed-time 30 --retry 2 --retry-delay 5 `
-                    -o $QtTar $url 2>&1 | ForEach-Object { Write-Host $_ }
+                    -o $QtTar $url
                 $rc = $LASTEXITCODE
                 $ErrorActionPreference = $oldEap
                 if ($rc -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) {
@@ -137,8 +140,11 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
             if ($ok) { break }
         }
         if (-not $ok) { throw "failed to download Qt sources from all mirrors" }
+        Write-Host "==> Qt sources downloaded: $((Get-Item $QtTar).Length / 1MB) MB"
+        Write-Host "==> extracting Qt sources (this can take a few minutes)..."
         tar -xf $QtTar   # bsdtar on Windows handles .tar.xz
         if (-not (Test-Path $QtDir)) { throw "failed to extract Qt sources" }
+        Write-Host "==> Qt sources extracted to $QtDir"
     } finally {
         Pop-Location
     }
@@ -152,7 +158,10 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         $ok = $false
         foreach ($try in 1..3) {
             try {
-                curl.exe -sSL --retry 3 -o $jomZip "https://download.qt.io/official_releases/jom/jom_1_1_4.zip"
+                Write-Host "==> downloading jom (parallel nmake)..."
+                curl.exe -sSL --connect-timeout 20 --max-time 300 --retry 3 --retry-delay 5 `
+                    -o $jomZip "https://download.qt.io/official_releases/jom/jom_1_1_4.zip"
+                if ($LASTEXITCODE -ne 0) { throw "jom curl exit $LASTEXITCODE" }
                 tar -xf $jomZip -C $toolsDir
                 if (Test-Path $jom) { $ok = $true; break }
             } catch {
