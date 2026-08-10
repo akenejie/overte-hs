@@ -26,6 +26,10 @@
 #include <vector>
 #include <climits>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <direct.h>
+#else
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -33,6 +37,11 @@
 #include <sys/prctl.h>
 #endif
 #include <unistd.h>
+#endif
+
+#if defined(_WIN32)
+#define WINDOWS_MAX_PATH 260
+#endif
 
 // Applet entry points (renamed from `main` by OVERTE_MULTICALL_APPLET)
 int domainServerMain(int argc, char* argv[]);
@@ -75,6 +84,20 @@ std::string getDataDir() {
     // Default to a directory next to the executable: the whole server state
     // (config, cache, logs) travels with the binary, so the install is portable
     // and nothing is written to $HOME, /run or /tmp.
+#if defined(_WIN32)
+    char exePath[WINDOWS_MAX_PATH];
+    DWORD n = GetModuleFileNameA(NULL, exePath, (DWORD)sizeof(exePath));
+    std::string exe;
+    if (n > 0 && n + 1 < sizeof(exePath)) {
+        exe.assign(exePath, (size_t)n);
+    }
+    if (!exe.empty()) {
+        size_t slash = exe.find_last_of("/\\");
+        std::string dir = (slash == std::string::npos) ? "." : exe.substr(0, slash);
+        return dir + "/data";
+    }
+    return "./data";
+#else
     char exePath[PATH_MAX];
     ssize_t len = ::readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
     if (len > 0) {
@@ -85,6 +108,7 @@ std::string getDataDir() {
         return dir + "/data";
     }
     return "./data";
+#endif
 }
 
 bool makeDirs(const std::string& path) {
@@ -93,10 +117,19 @@ bool makeDirs(const std::string& path) {
     }
     std::string current;
     for (size_t i = 0; i <= path.size(); ++i) {
-        if (i == path.size() || path[i] == '/') {
+        if (i == path.size() || path[i] == '/' || path[i] == '\\') {
             if (!current.empty()) {
-                if (::mkdir(current.c_str(), 0755) != 0 && errno != EEXIST) {
-                    return false;
+                bool isDriveLetter = (current.size() == 2 && current[1] == ':');
+                if (!isDriveLetter) {
+#if defined(_WIN32)
+                    if (_mkdir(current.c_str()) != 0 && errno != EEXIST) {
+                        return false;
+                    }
+#else
+                    if (::mkdir(current.c_str(), 0755) != 0 && errno != EEXIST) {
+                        return false;
+                    }
+#endif
                 }
             }
             if (i < path.size()) {
@@ -110,11 +143,16 @@ bool makeDirs(const std::string& path) {
 }
 
 void setEnv(const char* name, const std::string& value) {
+#if defined(_WIN32)
+    _putenv_s(name, value.c_str());
+#else
     ::setenv(name, value.c_str(), 1);
+#endif
 }
 
 struct ServerSpec {
     const char* label;
+    const char* labelCmd;   // multicall subcommand ("domain" | "audio" | ...)
     int (*appletMain)(int, char**);
     std::vector<std::string> args;
 };
@@ -126,6 +164,139 @@ void forwardSignal(int) {
 }
 
 int runChildren(std::vector<ServerSpec>& servers) {
+#if defined(_WIN32)
+    // Windows has no fork(): spawn each applet as a separate process of this
+    // same multicall binary ("overte-server <sub> ...") and supervise the
+    // resulting handles with WaitForSingleObject/GetExitCodeProcess polling.
+    char modulePathBuf[WINDOWS_MAX_PATH];
+    DWORD modulePathLen = GetModuleFileNameA(NULL, modulePathBuf, (DWORD)sizeof(modulePathBuf));
+    std::string modulePath;
+    if (modulePathLen > 0 && modulePathLen + 1 < sizeof(modulePathBuf)) {
+        modulePath.assign(modulePathBuf, (size_t)modulePathLen);
+    }
+    if (modulePath.empty()) {
+        std::fprintf(stderr, "overte-server: cannot resolve own exe path\n");
+        return 1;
+    }
+
+    std::vector<HANDLE> handles;
+    handles.reserve(servers.size());
+
+    for (auto& spec : servers) {
+        // build command line: "this.exe <sub> <arg>..."
+        std::string cmdLine = "\"" + modulePath + "\" " + spec.labelCmd;
+        for (auto& arg : spec.args) {
+            cmdLine += " \"" + arg + "\"";
+        }
+
+        std::vector<char> cmdBuf(cmdLine.begin(), cmdLine.end());
+        cmdBuf.push_back('\0');
+
+        STARTUPINFOA si;
+        ZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        PROCESS_INFORMATION pi;
+        ZeroMemory(&pi, sizeof(pi));
+
+        if (!CreateProcessA(NULL, &cmdBuf[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            std::fprintf(stderr, "overte-server: failed to spawn %s: error %lu\n",
+                         spec.label, (unsigned long)GetLastError());
+            // cleanup already-started children
+            for (auto h : handles) {
+                TerminateProcess(h, 1);
+                CloseHandle(h);
+            }
+            return 1;
+        }
+        CloseHandle(pi.hThread);
+        handles.push_back(pi.hProcess);
+
+        std::printf("overte-server: starting %s\n", spec.label);
+        std::fflush(stdout);
+    }
+
+    std::signal(SIGINT, forwardSignal);
+    std::signal(SIGTERM, forwardSignal);
+
+    bool stopping = false;
+    std::vector<bool> alive(handles.size(), true);
+    bool anyUnexpectedExit = false;
+
+    while (true) {
+        if (g_stopRequested && !stopping) {
+            std::fprintf(stderr, "overte-server: stopping\n");
+            stopping = true;
+            // Windows cannot deliver SIGTERM to other processes by PID; ask each
+            // child to exit via a posted console ctrl event is unreliable in CI,
+            // so fall back to TerminateProcess (best-effort graceful shutdown is
+            // done by the child's own handler on lost console ctrl).
+            for (size_t i = 0; i < handles.size(); ++i) {
+                if (alive[i]) {
+                    TerminateProcess(handles[i], 0);
+                }
+            }
+        }
+
+        bool allReaped = true;
+        for (size_t i = 0; i < handles.size(); ++i) {
+            if (!alive[i]) {
+                continue;
+            }
+            DWORD waitResult = WaitForSingleObject(handles[i], 0);
+            if (waitResult == WAIT_OBJECT_0) {
+                DWORD exitCode = 0;
+                GetExitCodeProcess(handles[i], &exitCode);
+                alive[i] = false;
+                if (!stopping && exitCode != 0) {
+                    anyUnexpectedExit = true;
+                    std::fprintf(stderr, "overte-server: %s exited unexpectedly (code %lu)\n",
+                                 servers[i].label, (unsigned long)exitCode);
+                }
+            } else {
+                allReaped = false;
+            }
+        }
+
+        if (anyUnexpectedExit && !stopping) {
+            std::fprintf(stderr, "overte-server: shutting down remaining servers\n");
+            stopping = true;
+            for (size_t i = 0; i < handles.size(); ++i) {
+                if (alive[i]) {
+                    TerminateProcess(handles[i], 0);
+                }
+            }
+        }
+
+        if (stopping) {
+            bool anyAlive = false;
+            for (size_t i = 0; i < handles.size(); ++i) {
+                if (alive[i]) {
+                    anyAlive = true;
+                    break;
+                }
+            }
+            if (!anyAlive) {
+                break;
+            }
+            SleepEx(100, FALSE);
+            continue;
+        }
+
+        if (allReaped) {
+            break;
+        }
+        SleepEx(200, FALSE);
+    }
+
+    for (auto h : handles) {
+        CloseHandle(h);
+    }
+
+    if (anyUnexpectedExit) {
+        return 1;
+    }
+    return 0;
+#else
     std::vector<pid_t> pids;
     pids.reserve(servers.size());
 
@@ -170,7 +341,6 @@ int runChildren(std::vector<ServerSpec>& servers) {
     std::vector<bool> alive(pids.size(), true);
     std::vector<int> statuses(pids.size(), 0);
     bool anyUnexpectedExit = false;
-    int unexpectedLabel = -1;
 
     while (true) {
         if (g_stopRequested && !stopping) {
@@ -195,7 +365,6 @@ int runChildren(std::vector<ServerSpec>& servers) {
                 statuses[i] = status;
                 if (!stopping && (!WIFEXITED(status) || WEXITSTATUS(status) != 0)) {
                     anyUnexpectedExit = true;
-                    unexpectedLabel = (int)i;
                     std::fprintf(stderr, "overte-server: %s exited unexpectedly (status %d)\n",
                                  servers[i].label, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
                 }
@@ -242,6 +411,7 @@ int runChildren(std::vector<ServerSpec>& servers) {
         return 1;
     }
     return 0;
+#endif
 }
 
 int startSupervisor(int argc, char* argv[]) {
@@ -311,14 +481,14 @@ int startSupervisor(int argc, char* argv[]) {
     makeDirs(dataDir + "/cache");
 
     std::vector<ServerSpec> servers;
-    servers.push_back({ "domain-server", domainServerMain,
+    servers.push_back({ "domain-server", "domain", domainServerMain,
         { "--port", domainPort, "--logOptions=" + logOptions } });
     if (withMixers) {
-        servers.push_back({ "audio-mixer", assignmentClientMain,
+        servers.push_back({ "audio-mixer", "audio", assignmentClientMain,
             { "-t", "0", "-p", audioPort, "-a", "127.0.0.1", "--server-port", domainPort, "--logOptions=" + logOptions } });
-        servers.push_back({ "avatar-mixer", assignmentClientMain,
+        servers.push_back({ "avatar-mixer", "avatar", assignmentClientMain,
             { "-t", "1", "-p", avatarPort, "-a", "127.0.0.1", "--server-port", domainPort, "--logOptions=" + logOptions } });
-        servers.push_back({ "entity-server", assignmentClientMain,
+        servers.push_back({ "entity-server", "entity", assignmentClientMain,
             { "-t", "6", "-p", entityPort, "-a", "127.0.0.1", "--server-port", domainPort, "--logOptions=" + logOptions } });
     } else {
         std::printf("overte-server: room mode (domain-server only, no domain registration); "
