@@ -96,9 +96,11 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         # The Qt source tarball on download.qt.io is often very slow (or stalls)
         # for hours from GitHub Actions runners. Use official mirrors first
         # (berkeley OCF is fastest from US runners), falling back to the other
-        # mirrors. Use Invoke-WebRequest (native .NET HttpClient) so the timeout
-        # is enforced reliably and failures produce a clear message - curl.exe
-        # via Start-Process gets a null exit code here and is untrustworthy.
+        # mirrors. Use curl.exe directly (not Start-Process, whose exit code is
+        # null here): --max-time caps the WHOLE transfer (Invoke-WebRequest's
+        # -TimeoutSec only covers the response headers, so a stalled body never
+        # times out), --speed-limit/--speed-time abort a stalled connection,
+        # and -C - resumes a partial file across retries.
         $ProgressPreference = 'SilentlyContinue'  # large download, avoid progress overhead
 
         $QtUrls = @(
@@ -109,14 +111,15 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         $ok = $false
         foreach ($url in $QtUrls) {
             Write-Host "==> downloading Qt from $url"
-            foreach ($try in 1..2) {
-                try {
-                    Remove-Item $QtTar -ErrorAction SilentlyContinue
-                    Invoke-WebRequest -Uri $url -OutFile $QtTar -TimeoutSec 600 -UseBasicParsing
-                    if ((Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) { $ok = $true; break }
-                } catch {
-                    Write-Warning "Qt source download attempt $try failed for $url : $($_.Exception.Message)"
+            foreach ($try in 1..3) {
+                curl.exe -fL --connect-timeout 20 --max-time 600 -C - `
+                    --speed-limit 1024 --speed-time 30 --retry 2 --retry-delay 5 `
+                    -o $QtTar $url 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0 -and (Test-Path $QtTar) -and ((Get-Item $QtTar).Length -gt 10000000)) {
+                    $ok = $true
+                    break
                 }
+                Write-Warning "Qt source download attempt $try failed for $url (curl exit $LASTEXITCODE)"
                 Start-Sleep -Seconds 5
             }
             if ($ok) { break }
