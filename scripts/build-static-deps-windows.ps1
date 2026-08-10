@@ -142,8 +142,29 @@ if (-not $SkipDeps -and -not (Test-Path $qtPrefix)) {
         if (-not $ok) { throw "failed to download Qt sources from all mirrors" }
         Write-Host "==> Qt sources downloaded: $((Get-Item $QtTar).Length / 1MB) MB"
         Write-Host "==> extracting Qt sources (this can take a few minutes)..."
-        tar -xf $QtTar   # bsdtar on Windows handles .tar.xz
-        if (-not (Test-Path $QtDir)) { throw "failed to extract Qt sources" }
+        # The Windows-bundled tar.exe (bsdtar) silently hangs on big .tar.xz
+        # archives under CI, with zero output - hard to diagnose. python is a
+        # required dependency, and its tarfile module reads .tar.xz natively, so
+        # extract with it and print progress every 200 files. That both avoids
+        # the hanging bsdtar and makes any real stall visible in the log.
+        $pyExtract = @'
+import sys, tarfile
+t = tarfile.open(sys.argv[1], "r:xz")
+members = t.getmembers()
+n = len(members)
+print(f"archive parsed: {n} members", flush=True)
+for i, m in enumerate(members):
+    t.extract(m, path=".")
+    if (i + 1) % 50 == 0 or (i + 1) == n:
+        print(f"extracted {i + 1}/{n} - {m.name}", flush=True)
+t.close()
+print("Qt source extraction complete", flush=True)
+'@
+        $pyFile = Join-Path $work "extract-qt.py"
+        Set-Content -Path $pyFile -Value $pyExtract -Encoding utf8
+        python $pyFile $QtTar
+        if ($LASTEXITCODE -ne 0) { throw "Qt source extraction failed (exit $LASTEXITCODE)" }
+        if (-not (Test-Path $QtDir)) { throw "failed to extract Qt sources (missing $QtDir)" }
         Write-Host "==> Qt sources extracted to $QtDir"
     } finally {
         Pop-Location
