@@ -199,12 +199,16 @@ print("Qt source extraction complete", flush=True)
 
     Push-Location (Join-Path $work $QtDir)
     try {
-        # -prefix / bakes the neutral "qt_prfxpath=/" into QtCore so no
-        # machine-specific path ends up in the final exe (same trick as the
-        # Linux build). INSTALL_ROOT relocates the files into deps/win.
+        # -prefix $qtPrefix installs straight into deps/win. Unlike the Linux
+        # build we can NOT use the "-prefix / + INSTALL_ROOT" relocatability
+        # trick: Windows needs a drive letter, qmake produces root-relative
+        # install paths, and every install target dies with "The filename,
+        # directory name, or volume label syntax is incorrect." Static Qt is
+        # linked into overte-server.exe at build time, so no machine-specific
+        # path ends up in the shipped binary regardless.
         # win32-msvc is the generic MSVC mkspec and works with VS2022.
         & .\configure.bat `
-            -prefix / -static -release -opensource -confirm-license `
+            -prefix $qtPrefix -static -release -opensource -confirm-license `
             -platform win32-msvc `
             -no-openssl -no-dbus -no-glib -no-icu -no-pch -no-opengl `
             -no-feature-zstd -no-feature-concurrent -no-feature-sql `
@@ -213,7 +217,6 @@ print("Qt source extraction complete", flush=True)
             -nomake examples -nomake tests -nomake tools
         if ($LASTEXITCODE -ne 0) { throw "Qt configure failed (exit $LASTEXITCODE)" }
 
-        $env:INSTALL_ROOT = $qtPrefix
         $env:OVERTE_BUILD_JOBS = "$Jobs"
         if ($make -eq "jom") { & $jom "-j$Jobs" } else { & nmake }
         if ($LASTEXITCODE -ne 0) { throw "Qt make failed (exit $LASTEXITCODE)" }
@@ -224,10 +227,9 @@ print("Qt source extraction complete", flush=True)
         Pop-Location
     }
 
-    # Fix the .prl files produced by a "-prefix /" build: the QT_INSTALL_LIBS
-    # property is emitted doubled ($$[QT_INSTALL_LIBS]$$[QT_INSTALL_LIBS]),
-    # which CMake expands to "<prefix>/lib/<prefix>/lib/..."; collapse it to a
-    # single placeholder. (MSVC library names are already correct: Qt5Core.lib.)
+    # The "-prefix /" root build doubles $$[QT_INSTALL_LIBS] inside the .prl
+    # files; with the real -prefix this no longer happens. Keep the fix anyway
+    # as a no-op guard: it only rewrites the doubled form, never a valid path.
     $prlFix = 's/\$\$\[QT_INSTALL_LIBS\]\$\$\[QT_INSTALL_LIBS\]/\$\$[QT_INSTALL_LIBS]/g'
     Get-ChildItem -Path $qtPrefix -Recurse -Filter *.prl | ForEach-Object {
         perl -i -pe $prlFix $_.FullName
