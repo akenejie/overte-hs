@@ -29,7 +29,7 @@
 #define FORCEINLINE inline
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
 #include <intrin.h>
 #define MUL64(a,b)  __emul((a), (b))
 #else

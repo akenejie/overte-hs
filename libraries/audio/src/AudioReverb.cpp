@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <cstring>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
 #include <intrin.h>
 #define MULHI(a,b)  ((int32_t)(__emul(a, b) >> 32))
 #else
