@@ -22,10 +22,13 @@
 #
 # Params:
 #   -Jobs <n>   jom build parallelism (default: logical processor count)
+#   -Arch <arch>  target architecture: x64 (default) or arm64. Auto-detected
+#               from the active MSVC env otherwise.
 
 param(
     [switch]$SkipDeps,
-    [int]$Jobs = 0
+    [int]$Jobs = 0,
+    [string]$Arch = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,24 +50,48 @@ $tbbPrefix = Join-Path $platformDir "onetbb-static"
 $toolsDir = Join-Path $buildDir "tools"
 if ($Jobs -le 0) { $Jobs = [System.Environment]::ProcessorCount }
 
+if (-not $Arch) {
+    # Prefer the arch the active MSVC environment targets; fall back to the
+    # host PROCESSOR_ARCHITECTURE (AMD64 on x64 machines, ARM64 on native arm64).
+    $Arch = if ($env:VSCMD_ARG_TGT_ARCH) { $env:VSCMD_ARG_TGT_ARCH } else { $env:PROCESSOR_ARCHITECTURE }
+}
+switch ($Arch.ToLowerInvariant()) {
+    { $_ -match "amd64|x64|^x$" } { $Arch = "x64"; break }
+    { $_ -match "arm64|aarch64" } { $Arch = "arm64"; break }
+    default { throw "Unsupported architecture '$Arch' (expected x64 or arm64)." }
+}
+$conanArch = if ($Arch -eq "arm64") { "armv8" } else { "x86_64" }
+# Qt 5.15's ARM64 mkspec is named win32-arm64-msvc2017 (works with VS2022).
+$qtPlatform = if ($Arch -eq "arm64") { "win32-arm64-msvc2017" } else { "win32-msvc" }
+
 Write-Host "==> project:   $root"
-Write-Host "==> platform:  windows (MSVC)"
+Write-Host "==> platform:  windows (MSVC $Arch)"
 Write-Host "==> deps dir:  $platformDir"
 Write-Host "==> jobs:      $Jobs"
 
 # --- 0. MSVC environment ----------------------------------------------------
-# If not already running in a Developer PowerShell (vswhere->vcvars64.bat),
-# activate the MSVC x64 environment and import it into this process.
+# If not already running in a Developer PowerShell (vswhere->vcvars), activate
+# the MSVC environment for the target arch and import it into this process.
 if (-not $env:VSCMD_ARG_TGT_ARCH) {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path $vswhere)) {
         throw "vswhere not found - install Visual Studio 2022 Build Tools with the C++ workload."
     }
-    $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-    if (-not $vsPath) { throw "No Visual Studio with the VC.Tools.x86.x64 component found." }
-    $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
-    Write-Host "==> activating MSVC environment: $vcvars"
-    $envDump = cmd /c "call `"$vcvars`" >nul 2>&1 && set"
+    if ($Arch -eq "arm64") {
+        $comp = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+        # Native arm64 hosts use vcvarsall with 'arm64'; an x64 host cross-builds
+        # with 'amd64_arm64'. Pick based on the actual host arch.
+        $hostArch = $env:PROCESSOR_ARCHITECTURE
+        $vcArg = if ($hostArch -match "ARM64") { "arm64" } else { "amd64_arm64" }
+    } else {
+        $comp = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+        $vcArg = "x64"
+    }
+    $vsPath = & $vswhere -latest -products * -requires $comp -property installationPath
+    if (-not $vsPath) { throw "No Visual Studio with the '$comp' component found." }
+    $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+    Write-Host "==> activating MSVC environment: $vcvars $vcArg"
+    $envDump = cmd /c "call `"$vcvars`" $vcArg >nul 2>&1 && set"
     foreach ($line in $envDump) {
         if ($line -match '^([^=]*)=(.*)$') {
             if ($matches[1] -ne '') {
@@ -214,10 +241,11 @@ print("Qt source extraction complete", flush=True)
         # directory name, or volume label syntax is incorrect." Static Qt is
         # linked into overte-server.exe at build time, so no machine-specific
         # path ends up in the shipped binary regardless.
-        # win32-msvc is the generic MSVC mkspec and works with VS2022.
+        # win32-msvc is the generic MSVC mkspec; win32-arm64-msvc2017 builds native
+        # arm64 (Qt 5.15 supports Windows on ARM64 via this mkspec).
         & .\configure.bat `
             -prefix $qtPrefix -static -release -opensource -confirm-license `
-            -platform win32-msvc `
+            -platform $qtPlatform `
             -no-openssl -no-dbus -no-glib -no-icu -no-pch -no-opengl `
             -no-feature-zstd -no-feature-concurrent -no-feature-sql `
             -qt-libpng -qt-libjpeg -qt-harfbuzz `
@@ -287,7 +315,8 @@ Write-Host "==> running conan install (toolchain into $buildDir/generators)..."
     conan profile detect --force
     if ($LASTEXITCODE -ne 0) { throw "conan profile detect failed (exit $LASTEXITCODE)" }
 conan install . -pr:h=default -pr:b=default -o headless=True -o qt_source=system `
-    -o openssl*:shared=False --build=missing --output-folder="$buildDir"
+    -o openssl*:shared=False --build=missing --output-folder="$buildDir" `
+    -s:a arch=$conanArch
 if ($LASTEXITCODE -ne 0) { throw "conan install failed (exit $LASTEXITCODE)" }
 
 # --- 4. CMake configure ------------------------------------------------------
