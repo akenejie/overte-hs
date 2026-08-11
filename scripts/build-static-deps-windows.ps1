@@ -302,7 +302,12 @@ print("Qt source extraction complete", flush=True)
 }
 
 # --- 2. static oneTBB (MSVC) ------------------------------------------------
-if (-not $SkipDeps -and -not (Test-Path $tbbPrefix)) {
+$tbbConfigFile = "$tbbPrefix\lib\cmake\TBB\TBBConfig.cmake"
+if (-not $SkipDeps -and -not (Test-Path $tbbConfigFile)) {
+    if (Test-Path $tbbPrefix) {
+        Write-Host "==> oneTBB cache incomplete (missing $tbbConfigFile); rebuilding"
+        Remove-Item -Recurse -Force $tbbPrefix
+    }
     $TbbVer = "2021.10.0"
     $work = Join-Path $env:TEMP "overte-tbb-windows"
     if (Test-Path $work) { Remove-Item -Recurse -Force $work }
@@ -312,9 +317,13 @@ if (-not $SkipDeps -and -not (Test-Path $tbbPrefix)) {
     Push-Location $work
     try {
         curl.exe -sL -o oneTBB.tar.gz "https://github.com/oneapi-src/oneTBB/archive/refs/tags/v$TbbVer.tar.gz"
+        if ($LASTEXITCODE -ne 0) { throw "oneTBB download failed (exit $LASTEXITCODE)" }
         tar -xf oneTBB.tar.gz
+        if (-not (Test-Path "oneTBB-$TbbVer")) { throw "oneTBB source extraction failed (missing oneTBB-$TbbVer)" }
         Set-Location "oneTBB-$TbbVer"
+        $vsPlatform = if ($Arch -eq "arm64") { "ARM64" } else { "x64" }
         cmake -S . -B build `
+            -A $vsPlatform `
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_SHARED_LIBS=OFF `
             -DTBB_TEST=OFF -DTBB_STRICT=OFF `
@@ -322,10 +331,16 @@ if (-not $SkipDeps -and -not (Test-Path $tbbPrefix)) {
             -DCMAKE_CXX_STANDARD=17 `
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
             "-DCMAKE_INSTALL_PREFIX=$tbbPrefix"
+        if ($LASTEXITCODE -ne 0) { throw "oneTBB configure failed (exit $LASTEXITCODE)" }
         cmake --build build --config Release
+        if ($LASTEXITCODE -ne 0) { throw "oneTBB build failed (exit $LASTEXITCODE)" }
         cmake --install build --config Release
+        if ($LASTEXITCODE -ne 0) { throw "oneTBB install failed (exit $LASTEXITCODE)" }
     } finally {
         Pop-Location
+    }
+    if (-not (Test-Path "$tbbPrefix\lib\cmake\TBB\TBBConfig.cmake")) {
+        throw "oneTBB install incomplete: missing $tbbPrefix\lib\cmake\TBB\TBBConfig.cmake"
     }
     Write-Host "==> static oneTBB installed to $tbbPrefix"
 } elseif (-not $SkipDeps) {
