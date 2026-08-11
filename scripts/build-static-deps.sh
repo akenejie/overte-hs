@@ -18,6 +18,8 @@
 # Environment:
 #   OVERTE_BUILD_JOBS=<n>   override the make/cmake job count (default: nproc).
 #                           Use a small value (e.g. 2-4) under QEMU emulation.
+#   OVERTE_QT_OPT=<flags>   extra ./configure flags for the static Qt build.
+#                           Pass "-optimize-size" under slow QEMU armv7 CI.
 #
 set -euo pipefail
 
@@ -147,6 +149,13 @@ if [ "$SKIP_DEPS" -eq 0 ] && [ ! -d "$QT_PREFIX" ]; then
         # macOS builds Qt as frameworks even in static builds; the headless
         # server links plain .a libraries, so install non-framework instead.
         QT_CONFIGURE_ARGS+=( -no-framework )
+    fi
+    if [ -n "${OVERTE_QT_OPT:-}" ]; then
+        # QEMU-emulated armv7 compiles are 20-50x slower; lowering Qt's
+        # optimization (e.g. -optimize-size / -Os) massively cuts compile
+        # time. QtCore's non-hot code is not perf-relevant for a headless
+        # server, so this is a free win on emulated CI only.
+        QT_CONFIGURE_ARGS+=( "$OVERTE_QT_OPT" )
     fi
     ./configure "${QT_CONFIGURE_ARGS[@]}"
     make -j"${OVERTE_BUILD_JOBS:-$JOBS}"

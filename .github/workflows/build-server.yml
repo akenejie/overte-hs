@@ -143,6 +143,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # i386 runs near-natively (IA-32 on the x86_64 kernel, no QEMU),
+          # so jobs=1 is plenty and Qt stays at -O2.
+          # armv7 is true QEMU user-mode emulation (20-50x slower); jobs=4 uses
+          # the 4 host cores across qemu processes, and OVERTE_QT_OPT reduces
+          # Qt's optimization to -Os, cutting the long template-heavy compiles.
           - name: linux-386
             image: i386/debian:bookworm
             platform: linux/386
@@ -150,13 +155,15 @@ jobs:
             jobs: 1
             rust-host: i686-unknown-linux-gnu
             conan-arch: x86
+            qt-opt: ""
           - name: linux-arm
             image: arm32v7/ubuntu:24.04
             platform: linux/arm/v7
             bin: linux_arm
-            jobs: 2
+            jobs: 4
             rust-host: armv7-unknown-linux-gnueabihf
             conan-arch: armv7
+            qt-opt: "-optimize-size"
 
     steps:
       - name: Checkout
@@ -180,6 +187,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/work" -w /work \
             -e DEBIAN_FRONTEND=noninteractive \
             -e OVERTE_BUILD_JOBS="${{ matrix.jobs }}" \
+            -e OVERTE_QT_OPT="${{ matrix.qt-opt }}" \
             -e BIN_NAME="${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}" \
             -e RUST_DEFAULT_HOST="${{ matrix.rust-host }}" \
             -e CONAN_ARCH="${{ matrix.conan-arch }}" \
