@@ -134,29 +134,30 @@ jobs:
 
   # --- Emulated builds: Linux i386 (386) and armv7 (arm) -------------------
   # GitHub has no 32-bit hosted runners, so the exact same pipeline runs
-  # natively inside a target-arch container under QEMU (setup-qemu registers
-  # binfmt on the host). OVERTE_BUILD_JOBS is kept low: QEMU emulation is slow.
+  # natively inside a target-arch container. i386 is IA-32 on an x86_64 kernel,
+  # so it runs at native speed. armv7 needs QEMU user-mode emulation:
+  #  - an x86_64 host emulating armv7 is 20-50x slower (never finishes on time)
+  #  - an arm64 host emulating armv7 (aarch32 user-mode) is only ~2-5x slower,
+  #    so linux-arm runs on the native ubuntu-24.04-arm runner.
+  # OVERTE_BUILD_JOBS and OVERTE_QT_OPT shrink the remaining emulation cost.
   emulated:
     name: ${{ matrix.name }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # i386 runs near-natively (IA-32 on the x86_64 kernel, no QEMU),
-          # so jobs=1 is plenty and Qt stays at -O2.
-          # armv7 is true QEMU user-mode emulation (20-50x slower); jobs=4 uses
-          # the 4 host cores across qemu processes, and OVERTE_QT_OPT reduces
-          # Qt's optimization to -Os, cutting the long template-heavy compiles.
           - name: linux-386
+            os: ubuntu-24.04
             image: i386/debian:bookworm
             platform: linux/386
             bin: linux_386
-            jobs: 1
+            jobs: 2
             rust-host: i686-unknown-linux-gnu
             conan-arch: x86
             qt-opt: ""
           - name: linux-arm
+            os: ubuntu-24.04-arm
             image: arm32v7/ubuntu:24.04
             platform: linux/arm/v7
             bin: linux_arm
