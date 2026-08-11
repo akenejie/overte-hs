@@ -239,7 +239,7 @@ print("Qt source extraction complete", flush=True)
         # then builds "Unknown_arm64" as the vcvars arch and configure dies.
         # Teach qmake about arm64 (fixed upstream in Qt 6, not backported).
         $qmakeSrc = Join-Path $work (Join-Path $QtDir "qmake\library\qmakeevaluator.cpp")
-        if (Test-Path $qmakeSrc -and
+        if ((Test-Path $qmakeSrc) -and
             -not (Select-String -Path $qmakeSrc -Quiet -SimpleMatch "PROCESSOR_ARCHITECTURE_ARM64")) {
             Write-Host "==> patching qmake for Windows ARM64 host detection"
             $armBlock = @(
