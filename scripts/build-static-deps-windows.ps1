@@ -234,6 +234,32 @@ print("Qt source extraction complete", flush=True)
 
     Push-Location (Join-Path $work $QtDir)
     try {
+        # Qt 5.15's qmake does not recognize PROCESSOR_ARCHITECTURE_ARM64 and
+        # reports QMAKE_HOST.arch=Unknown on a native ARM64 host. toolchain.prf
+        # then builds "Unknown_arm64" as the vcvars arch and configure dies.
+        # Teach qmake about arm64 (fixed upstream in Qt 6, not backported).
+        $qmakeSrc = Join-Path $work (Join-Path $QtDir "qmake\library\qmakeevaluator.cpp")
+        if (Test-Path $qmakeSrc -and
+            -not (Select-String -Path $qmakeSrc -Quiet -SimpleMatch "PROCESSOR_ARCHITECTURE_ARM64")) {
+            Write-Host "==> patching qmake for Windows ARM64 host detection"
+            $armBlock = @(
+                "# endif"
+                "# ifdef PROCESSOR_ARCHITECTURE_ARM64"
+                "    case PROCESSOR_ARCHITECTURE_ARM64:"
+                '        archStr = ProString("arm64");'
+                "        break;"
+                "# endif"
+                "    case PROCESSOR_ARCHITECTURE_INTEL:"
+            ) -join "`n"
+            $anchor = "# endif`n    case PROCESSOR_ARCHITECTURE_INTEL:"
+            $qmakeText = Get-Content -Raw -Path $qmakeSrc
+            if ($qmakeText.Contains($anchor)) {
+                $qmakeText = $qmakeText.Replace($anchor, $armBlock)
+                Set-Content -Path $qmakeSrc -Value $qmakeText -NoNewline -Encoding ascii
+            } else {
+                throw "qmake ARM64 patch failed: anchor not found in $qmakeSrc"
+            }
+        }
         # -prefix $qtPrefix installs straight into deps/win. Unlike the Linux
         # build we can NOT use the "-prefix / + INSTALL_ROOT" relocatability
         # trick: Windows needs a drive letter, qmake produces root-relative
