@@ -24,9 +24,9 @@ scripts also handle macOS; Windows needs the equivalent steps under MSVC (see
 
 ## Result
 
-A single `overte-server` binary runs the whole four-process stack as a multicall
-(`busybox`-style) executable: `domain`, `audio`, `avatar` and `entity` subcommands dispatch to
-the four applets, and `start` launches them as supervised children. It builds, starts, binds
+A single `overte-server` binary runs the whole five-process stack as a multicall
+(`busybox`-style) executable: `--domain`/`--audio`/`--avatar`/`--entity`/`--assets` flags
+dispatch to the five applets, launched as supervised children. It builds, starts, binds
 all UDP ports and runs together:
 
 ```
@@ -37,12 +37,13 @@ $ ldd overte-server | grep -v vdso
 	libc.so.6
 	/lib64/ld-linux-x86-64.so.2
 
-$ ./overte-server start --domain-port 41302 --with-mixers \
-                        --audio-port 41303 --avatar-port 41304 --entity-port 41305
+$ ./overte-server --domain 41302 --audio 41303 --avatar 41304 \
+                  --entity 41305 --assets 41306
 overte-server: starting domain-server
 overte-server: starting audio-mixer
 overte-server: starting avatar-mixer
 overte-server: starting entity-server
+overte-server: starting asset-server
 ```
 
 The `domain` applet serves its settings schema (`describe-settings.json`) from resources
@@ -255,38 +256,49 @@ dead code.
 `overte-server/CMakeLists.txt` collects the sources of `domain-server` and
 `assignment-client`, compiles them into one binary and defines `OVERTE_MULTICALL_APPLET`, which
 renames each applet's `main` to `domainServerMain` / `assignmentClientMain`. The dispatcher in
-`overte-server/src/main.cpp` parses the subcommand and either calls the applet directly or
-forks it as a supervised child:
+`overte-server/src/main.cpp` parses the flags (`--domain/--audio/--avatar/--entity/--assets`) and
+forks the chosen applets as supervised children:
 
-- `overte-server domain --port N`   — domain server directly (like a single-server run)
-- `overte-server audio/avatar/entity -p N -a HOST --server-port D` — one assignment client
-- `overte-server start --domain-port N` — the default room: only the domain server runs; the
-  audio/avatar/entity servers are **not** started and nothing registers to a domain
-- `overte-server start --domain-port N --with-mixers --audio-port N --avatar-port N --entity-port N`
-  — fork all four applets, supervise them, forward SIGINT/SIGTERM, and shut everything down if
-  any child exits unexpectedly
-- `overte-server help | version`
+- `overte-server --domain N` — the default room: only the domain server runs; the
+  audio/avatar/entity/asset servers are **not** started and nothing registers to a domain
+- `overte-server --domain N --audio N --avatar N --entity N --assets N` — fork all five
+  applets, supervise them, forward SIGINT/SIGTERM, and shut everything down if any child exits
+  unexpectedly
+- `overte-server --entity N --assets N --host HOST:PORT` — start a subset of servers and
+  register them to a remote domain (no local domain)
+- `overte-server --help | --version`
+
+(An undocumented `domain`/`audio`/`avatar`/`entity`/`assets` token in argv[1] also runs a
+single applet directly; the Windows supervisor uses it to spawn one process per applet.)
 
 Notes:
-- **Domain registration is opt-in.** The standalone `domain` subcommand and the default `start`
-  run your room with just the domain server. Only `--with-mixers` (or running the
-  `audio`/`avatar`/`entity` subcommands yourself) starts the mixer/entity servers and registers
-  them to the domain — the classic Overte node registration.
+- **Domain registration is opt-in.** The default room has no mixers. Only flags such as
+  `--audio`/`--avatar`/`--entity`/`--assets` start those servers and register them to the
+  domain — the classic Overte node registration.
 - `SKIP_AUTOMOC ON` in headless mode for `AssetsBackupHandler.h`: the class body disappears
   under `OVERTE_HEADLESS`, and generating a moc file for it would leave an undefined vtable
   reference.
 - `resources.qrc` embeds `domain-server/resources/describe-settings.json` under `:/resources/`,
   and `DomainServerSettingsManager` falls back to it when the file is absent on disk.
-- The `start` subcommand isolates `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` under a
-  `data/` directory next to the executable by default (override with `--data-dir`), so the
-  whole server state is portable with the binary and no user home directory, `/run` or `/tmp`
-  is touched.
+- Every server runs inside one data directory (the `data/` folder in the current working
+  directory by default, override with `--data`), so the whole server state is portable with
+  that folder and no user home directory, `/run` or `/tmp` is touched. `OVERTE_DATA_DIR` pins
+  `PathUtils::getAppDataPath()` to that directory, so `config.json`, `entities/` and `assets/`
+  are written flat at its root; the transient QSettings/cache data is redirected via
+  `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` into a `cache/` subtree that is deleted
+  when the server shuts down. Copying the whole data directory (or just `config.json`,
+  `entities/`, `assets/`) moves the setup to another machine.
+- **Files are owned by one server each**, which is what makes integration and distribution
+  trivial: `config.json` is read/written only by the domain-server, `assets/` only by the
+  asset-server, and `entities/` by the domain-server (its backup) and the entity-server (its
+  persistence; the default `resources/models.svo` never collides with the domain's
+  `models.json.gz`). Run a subset of servers on one machine and they share one data folder;
+  copy the folder a server owns to another machine and it stands that server up there.
 - Children install `PR_SET_PDEATHSIG SIGTERM` so a crashed supervisor never leaves orphans.
-- **Ports are command-line-only.** Every applet takes its UDP port from `--port`/`-p`
-  (`--domain-port`/`--audio-port`/`--avatar-port`/`--entity-port` in `start`). The domain
-  applet requires `--port` and never reads `metaverse.local_port` from the settings/config
-  files; the port is also never persisted to any config file (the generated
-  `domain-server/config.json` contains no port).
+- **Ports are command-line-only.** Every server takes its UDP port from its flag
+  (`--domain`/`--audio`/`--avatar`/`--entity`/`--assets <port>`). The domain applet never
+  reads `metaverse.local_port` from the settings/config files; the port is also never persisted
+  to any config file (the generated `config.json` contains no port).
 
 ## 5. Verify
 
@@ -296,42 +308,45 @@ ldd overte-server          # system shared libs only (libpng16/libharfbuzz/libjp
 strings overte-server | grep qt_prfxpath   # qt_prfxpath=/  (no machine path)
 strings overte-server | grep -c '/mnt\|/home\|/Users'   # 0: no build-machine path embedded
 readelf -d overte-server | grep -i rpath   # (no output: no RUNPATH either)
-./overte-server help       # exit code 0
-./overte-server domain --port 41302   # binds UDP 41302 (Ctrl-C to stop)
+./overte-server --help    # exit code 0
+./overte-server --domain 41302   # binds UDP 41302 (Ctrl-C to stop)
 
 # default room: one domain server, no domain registration (one UDP socket)
-./overte-server start --domain-port 41302 &
-# ... ss -ulpn | grep 4130  -> 1 socket; log says "room mode"
+./overte-server --domain 41302 &
+# ... ss -ulpn | grep 4130  -> 1 socket
 kill -TERM $!
 
-# full stack: --with-mixers registers the audio/avatar/entity servers to the domain
-./overte-server start --domain-port 41302 --with-mixers --audio-port 41303 \
-                      --avatar-port 41304 --entity-port 41305 &
-# ... ss -ulpn | grep 4130[2-5]  -> 4 sockets
+# full stack: mixers + entity + asset servers all register to the domain
+./overte-server --domain 41302 --audio 41303 --avatar 41304 \
+                --entity 41305 --assets 41306 &
+# ... ss -ulpn | grep 4130[2-6]  -> 5 sockets
 kill -TERM $!   # "overte-server: stopping", all children quit, ports released
 ```
 
 ## 6. Run the stack
 
-Use the `start` subcommand of the single binary. By default it launches just the domain server
-(your room) and isolates its config/cache/logs; add `--with-mixers` to also run the
-audio/avatar/entity servers and register them to the domain:
+The binary takes one flag per server; pass the ports of every server you want to run. All data
+lives in a `data/` folder in the current directory (override with `--data`).
 
 ```bash
 # room only (no domain registration)
-./overte-server start --domain-port 40102 [--data-dir /path/to/data]
+./overte-server --domain 40102 [--data /path/to/data]
 
-# full stack (domain + mixers + entity server, all registering to the domain)
-./overte-server start --domain-port 40102 --with-mixers \
-                      --audio-port 40103 --avatar-port 40104 --entity-port 40105 \
-                      [--data-dir /path/to/data]
+# full stack (domain + mixers + entity + asset servers, registering to the domain)
+./overte-server --domain 40102 --audio 40103 --avatar 40104 \
+                --entity 40105 --assets 40106 [--data /path/to/data]
+
+# entity + asset servers on another machine, registering to a remote domain
+./overte-server --entity 40105 --assets 40106 --host 192.168.1.5:40102
 ```
 
-Options: `--domain-port --audio-port --avatar-port --entity-port --with-mixers --data-dir`,
-`-h/--help`. `--with-mixers` requires all three mixer/entity ports. The supervisor shuts
-everything down together on SIGINT/SIGTERM. If a port is already in use, the affected applet
-exits non-zero and the supervisor shuts down the rest of the stack and exits with status 1,
-instead of leaving a half-running stack.
+Options: `--domain --audio --avatar --entity --assets --host --data --log-options`,
+`-h/--help`, `--version`. Each `--* <port>` starts that server on the given UDP port;
+`--domain` also makes the other servers register to `localhost:<port>`, and `--host
+<host[:port]>` overrides the registration target (required as `host:port` when `--domain` is
+absent). The supervisor shuts everything down together on SIGINT/SIGTERM. If a port is already
+in use, the affected applet exits non-zero and the supervisor shuts down the rest of the stack
+and exits with status 1, instead of leaving a half-running stack.
 
 ## Limitations
 
@@ -344,7 +359,8 @@ instead of leaving a half-running stack.
   `run()`/`runWithResult()` skip execution. The few background tasks that would use
   `QtConcurrent::run` fall back to `std::thread` or run synchronously.
 - **Cross-platform (absolute requirement)**: the whole point of the project is that **a single
-  self-contained binary plus a data folder copied next to it hosts a VR space on any OS** - no
+  self-contained binary plus a data folder (default `data/` in the working directory) hosts a
+  VR space on any OS** - no
   installer, no admin rights, no Qt runtime. Ports are passed as command-line arguments. All
   three targets are required:
   - **Linux** — verified end-to-end here (dependencies downloaded and built from scratch, no

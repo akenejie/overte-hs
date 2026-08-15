@@ -4,14 +4,13 @@
 //
 //  Multicall single-binary entry point for the Overte headless VR room stack.
 //
-//  Subcommands:
-//    domain ...              run the domain-server applet
-//    audio ...               run the audio-mixer assignment-client (type 0)
-//    avatar ...              run the avatar-mixer assignment-client (type 1)
-//    entity ...              run the entity-server assignment-client (type 6)
-//    start --domain-port P [--with-mixers --audio-port P --avatar-port P --entity-port P]
-//                            run the domain-server (your room); with --with-mixers also run
-//                            the audio/avatar/entity servers and register them to the domain
+//  Usage: start any combination of servers with --domain/--audio/--avatar/
+//  --entity/--assets <port>; the --host/--data/--log-options flags configure
+//  registration target, data directory and logging. See printUsage() below.
+//
+//  (An undocumented applet-token dispatch - "domain", "audio", "avatar",
+//  "entity", "assets" as argv[1] - is kept as the internal spawn target that
+//  the Windows supervisor uses to re-run this binary per applet.)
 //
 //  Distributed under the Apache License, Version 2.0.
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
@@ -25,6 +24,8 @@
 #include <string>
 #include <vector>
 #include <climits>
+#include <cctype>
+#include <filesystem>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -54,61 +55,55 @@ void printUsage(const char* prog) {
         "overte-server - single-binary Overte headless VR server\n"
         "\n"
         "Usage:\n"
-        "  %1$s domain --port <port> [other domain-server options]\n"
-        "  %1$s audio  -p <port> -a <host> --server-port <domain-port> [options]\n"
-        "  %1$s avatar -p <port> -a <host> --server-port <domain-port> [options]\n"
-        "  %1$s entity -p <port> -a <host> --server-port <domain-port> [options]\n"
-        "  %1$s start --domain-port <p>\n"
-        "             [--with-mixers --audio-port <p> --avatar-port <p> --entity-port <p>]\n"
-        "             [--data-dir <dir>] [--log-options <opts>]\n"
-        "  %1$s help | version\n"
+        "  %1$s [--domain <port>] [--audio <port>] [--avatar <port>] [--entity <port>]\n"
+        "        [--assets <port>] [--host <host[:port]>] [--data <dir>]\n"
+        "        [--log-options <opts>]\n"
+        "  %1$s -h | --help\n"
+        "  %1$s --version\n"
         "\n"
-        "By default 'start' runs only the domain-server (your room): no mixers are run and\n"
-        "nothing registers to a domain. Add --with-mixers to also run the audio/avatar/entity\n"
-        "servers and register them to the domain (classic domain registration).\n"
+        "Run any combination of the Overte servers in one process group. Each --* <port>\n"
+        "flag starts that server on the given UDP port:\n"
+        "  --domain <port>   the domain-server (your room). Also makes the other servers\n"
+        "                    register to it at localhost:<port>.\n"
+        "  --audio  <port>   the audio mixer\n"
+        "  --avatar <port>   the avatar mixer\n"
+        "  --entity <port>   the entity server\n"
+        "  --assets <port>   the asset server\n"
         "\n"
-        "All config/cache/log data is kept next to this executable in %1$s's\n"
-        "'data' directory (override with --data-dir); nothing is written to the\n"
-        "home directory, /run or /tmp, and no port is stored in any config file.\n"
+        "Without --domain the other servers register to an existing domain instead:\n"
+        "  --host <host[:port]>  domain address for them. The host defaults to localhost and\n"
+        "                        the port to the --domain port; when --domain is absent the\n"
+        "                        port must be given (use the host:port form).\n"
+        "\n"
+        "All server state lives in a 'data' directory in the current directory by default\n"
+        "(override with --data): config.json, entities/ and assets/ are kept there, and any\n"
+        "transient cache is removed when the server shuts down. Each file belongs to one\n"
+        "server - config.json to the domain-server, entities/ to the domain/entity servers,\n"
+        "assets/ to the asset-server - so copying the folders a server owns to another\n"
+        "machine stands that server up there. Nothing is written to the home directory,\n"
+        "/run or /tmp, and no port is stored in any config file.\n"
         "\n"
         "Examples:\n"
-        "  %1$s start --domain-port 40102   # room only, no domain registration\n"
-        "  %1$s start --domain-port 40102 --with-mixers --audio-port 40103 \\\n"
-        "             --avatar-port 40104 --entity-port 40105   # full stack\n"
-        "  %1$s domain --port 40102\n"
-        "  %1$s audio -p 40103 -a 127.0.0.1 --server-port 40102\n",
+        "  %1$s --domain 40102                              # room only\n"
+        "  %1$s --domain 40102 --audio 40103 --avatar 40104 \\\n"
+        "        --entity 40105 --assets 40106              # full stack\n"
+        "  %1$s --entity 40105 --assets 40106 \\\n"
+        "        --host 192.168.1.5:40102                   # remote entity+asset servers\n"
+        "  %1$s --domain 40102 --host 192.168.1.5           # register mixers to another host\n",
         prog);
 }
 
 std::string getDataDir() {
-    // Default to a directory next to the executable: the whole server state
-    // (config, cache, logs) travels with the binary, so the install is portable
-    // and nothing is written to $HOME, /run or /tmp.
-#if defined(_WIN32)
-    char exePath[WINDOWS_MAX_PATH];
-    DWORD n = GetModuleFileNameA(NULL, exePath, (DWORD)sizeof(exePath));
-    std::string exe;
-    if (n > 0 && n + 1 < sizeof(exePath)) {
-        exe.assign(exePath, (size_t)n);
+    // Default to a 'data' directory in the current working directory: the whole
+    // server state (config, entities, assets) travels with the folder you run the
+    // command from, so setups are portable and nothing is written to $HOME, /run
+    // or /tmp. Override with --data.
+    std::error_code ec;
+    auto cwd = std::filesystem::current_path(ec);
+    if (ec) {
+        return "data";
     }
-    if (!exe.empty()) {
-        size_t slash = exe.find_last_of("/\\");
-        std::string dir = (slash == std::string::npos) ? "." : exe.substr(0, slash);
-        return dir + "/data";
-    }
-    return "./data";
-#else
-    char exePath[PATH_MAX];
-    ssize_t len = ::readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
-    if (len > 0) {
-        exePath[len] = '\0';
-        std::string exe(exePath);
-        size_t slash = exe.find_last_of('/');
-        std::string dir = (slash == std::string::npos) ? "." : exe.substr(0, slash);
-        return dir + "/data";
-    }
-    return "./data";
-#endif
+    return (cwd / "data").string();
 }
 
 bool makeDirs(const std::string& path) {
@@ -148,6 +143,159 @@ void setEnv(const char* name, const std::string& value) {
 #else
     ::setenv(name, value.c_str(), 1);
 #endif
+}
+
+// ---------------------------------------------------------------------------
+// Data layout
+//
+// The launcher pins the whole server state to one directory (--data-dir, or a
+// 'data' folder next to this executable). Everything a server keeps is written
+// flat into it, and everything transient goes into a cache/ subtree that is
+// removed on shutdown:
+//
+//   <data-dir>/config.json   domain settings (also a directory-independent copy
+//                            source for manual back-ups)
+//   <data-dir>/entities/     entity model backups / entity-server persistence
+//   <data-dir>/assets/       uploaded asset files
+//   <data-dir>/cache/        QSettings + QStandardPaths + resource caches;
+//                            deleted on exit
+//
+// Applets locate their data through PathUtils::getAppDataPath(), which honours
+// the OVERTE_DATA_DIR variable; the cache/ subtree is reached through the
+// XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME variables that point inside it.
+// ---------------------------------------------------------------------------
+
+// Remove a directory tree (never follows symlinks out of the tree).
+void removeTree(const std::string& path) {
+    std::error_code ec;
+    std::filesystem::remove_all(path, ec);
+}
+
+// Move a single file into a destination directory; an existing target wins.
+void moveFileInto(const std::filesystem::path& src, const std::filesystem::path& dstDir) {
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(src, ec)) {
+        return;
+    }
+    std::filesystem::create_directories(dstDir, ec);
+    std::filesystem::path dst = dstDir / src.filename();
+    if (!std::filesystem::exists(dst, ec)) {
+        std::filesystem::rename(src, dst, ec);
+    }
+}
+
+// Move the contents of a source directory into a destination directory.
+void moveDirContentsInto(const std::filesystem::path& srcDir, const std::filesystem::path& dstDir) {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(srcDir, ec)) {
+        return;
+    }
+    std::filesystem::create_directories(dstDir, ec);
+    for (const auto& entry : std::filesystem::directory_iterator(srcDir, ec)) {
+        std::error_code entryEc;
+        std::filesystem::path dst = dstDir / entry.path().filename();
+        if (!std::filesystem::exists(dst, entryEc)) {
+            std::filesystem::rename(entry.path(), dst, entryEc);
+        }
+    }
+}
+
+// Migrate the pre-flat layout (<dataDir>/data/<organization>/<app>/...) into the
+// flat layout (<dataDir>/config.json, <dataDir>/entities/, <dataDir>/assets/).
+void migrateLegacyData(const std::string& dataDir) {
+    std::error_code ec;
+    const std::filesystem::path legacyRoot(dataDir + "/data");
+    if (std::filesystem::is_directory(legacyRoot, ec)) {
+        for (const auto& orgEntry : std::filesystem::directory_iterator(legacyRoot, ec)) {
+            if (!orgEntry.is_directory(ec)) {
+                continue;
+            }
+            const auto& orgDir = orgEntry.path();
+            moveFileInto(orgDir / "domain-server" / "config.json", dataDir);
+            moveDirContentsInto(orgDir / "domain-server" / "entities", std::filesystem::path(dataDir) / "entities");
+            moveDirContentsInto(orgDir / "assignment-client" / "entities", std::filesystem::path(dataDir) / "entities");
+            moveDirContentsInto(orgDir / "assignment-client" / "assets", std::filesystem::path(dataDir) / "assets");
+        }
+        removeTree(legacyRoot.string());
+    }
+    // the old 'start' also created an empty XDG_CONFIG_HOME container here; it
+    // only held transient QSettings files, so drop it with the rest
+    removeTree(dataDir + "/config");
+}
+
+// Prepare <dataDir> as the single writable root for a run: migrate old layouts,
+// drop a stale cache/ from a previous crashed run, and point applets at the
+// flat data location with all transient state inside cache/.
+bool setupDataDir(const std::string& dataDir) {
+    if (!makeDirs(dataDir)) {
+        return false;
+    }
+    migrateLegacyData(dataDir);
+    removeTree(dataDir + "/cache");
+
+    setEnv("OVERTE_DATA_DIR", dataDir);
+    setEnv("XDG_DATA_HOME", dataDir + "/cache/data");
+    setEnv("XDG_CONFIG_HOME", dataDir + "/cache/config");
+    setEnv("XDG_CACHE_HOME", dataDir + "/cache");
+
+    makeDirs(dataDir + "/cache");
+    makeDirs(dataDir + "/cache/data");
+    makeDirs(dataDir + "/cache/config");
+    return true;
+}
+
+// Remove the transient cache/ subtree so that only config.json, entities/ and
+// assets/ remain in the data dir.
+void cleanupTransientData(const std::string& dataDir) {
+    removeTree(dataDir + "/cache");
+}
+
+// Look for a --data-dir <path> pair in a subcommand's arguments (the applet
+// parsers themselves do not know the option).
+std::string findDataDir(int argc, char* argv[], int firstArg) {
+    for (int i = firstArg; i + 1 < argc; ++i) {
+        if (std::strcmp(argv[i], "--data-dir") == 0) {
+            return argv[i + 1];
+        }
+    }
+    return "";
+}
+
+// Drop --data-dir <path> pairs from an argument vector before forwarding it to
+// an applet.
+void stripDataDir(std::vector<std::string>& args) {
+    std::vector<std::string> kept;
+    kept.reserve(args.size());
+    for (size_t i = 0; i < args.size(); ++i) {
+        if (args[i] == "--data-dir" && i + 1 < args.size()) {
+            ++i;
+        } else {
+            kept.push_back(args[i]);
+        }
+    }
+    args = std::move(kept);
+}
+
+std::vector<char*> makeArgv(const std::string& prog, std::vector<std::string>& args) {
+    std::vector<char*> argv;
+    argv.reserve(args.size() + 2);
+    argv.push_back(const_cast<char*>(prog.c_str()));
+    for (auto& arg : args) {
+        argv.push_back(const_cast<char*>(arg.c_str()));
+    }
+    argv.push_back(nullptr);
+    return argv;
+}
+
+// Run an applet main under the isolated data dir, then clear the transient
+// cache so only the flat persistent state remains.
+int runApplet(int (*appletMain)(int, char**), const std::string& prog,
+              std::vector<std::string> args, const std::string& dataDir) {
+    stripDataDir(args);
+    std::vector<char*> argvPtrs = makeArgv(prog, args);
+    int result = appletMain((int)argvPtrs.size() - 1, argvPtrs.data());
+    cleanupTransientData(dataDir);
+    return result;
 }
 
 struct ServerSpec {
@@ -414,13 +562,43 @@ int runChildren(std::vector<ServerSpec>& servers) {
 #endif
 }
 
-int startSupervisor(int argc, char* argv[]) {
-    std::string domainPort, audioPort, avatarPort, entityPort;
+// Split "host[:port]" (also "[v6]:port") into its parts. A bare host yields an
+// empty port; a host with a trailing numeric :port yields both parts.
+void splitHostPort(const std::string& value, std::string& host, std::string& port) {
+    host = value;
+    port.clear();
+    auto colon = value.find_last_of(':');
+    if (colon == std::string::npos) {
+        return;
+    }
+    std::string maybePort = value.substr(colon + 1);
+    bool allDigits = !maybePort.empty();
+    for (char c : maybePort) {
+        if (!std::isdigit(static_cast<unsigned char>(c))) {
+            allDigits = false;
+            break;
+        }
+    }
+    if (!allDigits) {
+        return;
+    }
+    host = value.substr(0, colon);
+    if (host.size() >= 2 && host.front() == '[' && host.back() == ']') {
+        host = host.substr(1, host.size() - 2);
+    }
+    port = maybePort;
+}
+
+// Flag-based supervisor: `--domain/--audio/--avatar/--entity/--assets <port>`
+// start servers, `--host`/`--data`/`--log-options` configure them. See
+// printUsage() for the full interface.
+int flagSupervisor(int argc, char* argv[]) {
+    std::string domainPort, audioPort, avatarPort, entityPort, assetsPort;
+    std::string host;
     std::string dataDir;
     std::string logOptions = "nojournald";
-    bool withMixers = false;
 
-    for (int i = 2; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         auto valueOf = [&](const char* name) -> std::string {
             if (arg == name && i + 1 < argc) {
@@ -428,74 +606,107 @@ int startSupervisor(int argc, char* argv[]) {
             }
             return "";
         };
-        if (arg == "--domain-port") {
-            domainPort = valueOf("--domain-port");
-        } else if (arg == "--audio-port") {
-            audioPort = valueOf("--audio-port");
-        } else if (arg == "--avatar-port") {
-            avatarPort = valueOf("--avatar-port");
-        } else if (arg == "--entity-port") {
-            entityPort = valueOf("--entity-port");
-        } else if (arg == "--with-mixers") {
-            withMixers = true;
-        } else if (arg == "--data-dir") {
-            dataDir = valueOf("--data-dir");
+        if (arg == "--domain") {
+            domainPort = valueOf("--domain");
+        } else if (arg == "--audio") {
+            audioPort = valueOf("--audio");
+        } else if (arg == "--avatar") {
+            avatarPort = valueOf("--avatar");
+        } else if (arg == "--entity") {
+            entityPort = valueOf("--entity");
+        } else if (arg == "--assets") {
+            assetsPort = valueOf("--assets");
+        } else if (arg == "--host") {
+            host = valueOf("--host");
+        } else if (arg == "--data") {
+            dataDir = valueOf("--data");
         } else if (arg == "--log-options") {
             logOptions = valueOf("--log-options");
         } else if (arg == "-h" || arg == "--help") {
             printUsage(argv[0]);
             return 0;
+        } else if (arg == "--version") {
+            std::printf("overte-server multicall binary\n");
+            return 0;
         } else {
-            std::fprintf(stderr, "overte-server: unknown start option: %s\n", arg.c_str());
+            std::fprintf(stderr, "overte-server: unknown option: %s\n", arg.c_str());
             printUsage(argv[0]);
             return 1;
         }
     }
 
-    if (domainPort.empty()) {
-        std::fprintf(stderr, "overte-server: start requires --domain-port\n");
+    bool haveAny = !domainPort.empty() || !audioPort.empty() || !avatarPort.empty()
+                || !entityPort.empty() || !assetsPort.empty();
+    if (!haveAny) {
+        std::fprintf(stderr, "overte-server: specify at least one of --domain/--audio/--avatar/--entity/--assets\n");
         printUsage(argv[0]);
         return 1;
     }
 
-    if (withMixers && (audioPort.empty() || avatarPort.empty() || entityPort.empty())) {
-        std::fprintf(stderr, "overte-server: --with-mixers requires --audio-port, --avatar-port and --entity-port\n");
-        printUsage(argv[0]);
-        return 1;
+    // registration target for the assignment-client servers
+    std::string acHost, acPort;
+    if (!domainPort.empty()) {
+        // local domain: mixers register to localhost:<port>, or to an explicit --host
+        acPort = domainPort;
+        acHost = "localhost";
+        if (!host.empty()) {
+            std::string hostPart, portPart;
+            splitHostPort(host, hostPart, portPart);
+            if (!hostPart.empty()) {
+                acHost = hostPart;
+            }
+        }
+    } else {
+        // remote domain: --host must carry the domain port (host:port form)
+        if (host.empty()) {
+            std::fprintf(stderr, "overte-server: --host is required when --domain is not given\n");
+            printUsage(argv[0]);
+            return 1;
+        }
+        std::string hostPart, portPart;
+        splitHostPort(host, hostPart, portPart);
+        if (portPart.empty()) {
+            std::fprintf(stderr, "overte-server: --host must include the domain port (use host:port form) when --domain is not given\n");
+            printUsage(argv[0]);
+            return 1;
+        }
+        acHost = hostPart.empty() ? "localhost" : hostPart;
+        acPort = portPart;
     }
 
     if (dataDir.empty()) {
         dataDir = getDataDir();
     }
-    if (!makeDirs(dataDir)) {
-        std::fprintf(stderr, "overte-server: cannot create data dir %s (use --data-dir to point elsewhere)\n", dataDir.c_str());
+    if (!setupDataDir(dataDir)) {
+        std::fprintf(stderr, "overte-server: cannot prepare data dir %s (use --data to point elsewhere)\n", dataDir.c_str());
         return 1;
     }
 
-    // isolate settings, cache and logs from the user's home directory
-    setEnv("XDG_DATA_HOME", dataDir + "/data");
-    setEnv("XDG_CONFIG_HOME", dataDir + "/config");
-    setEnv("XDG_CACHE_HOME", dataDir + "/cache");
-    makeDirs(dataDir + "/data");
-    makeDirs(dataDir + "/config");
-    makeDirs(dataDir + "/cache");
-
     std::vector<ServerSpec> servers;
-    servers.push_back({ "domain-server", "domain", domainServerMain,
-        { "--port", domainPort, "--logOptions=" + logOptions } });
-    if (withMixers) {
+    if (!domainPort.empty()) {
+        servers.push_back({ "domain-server", "domain", domainServerMain,
+            { "--port", domainPort, "--logOptions=" + logOptions } });
+    }
+    if (!audioPort.empty()) {
         servers.push_back({ "audio-mixer", "audio", assignmentClientMain,
-            { "-t", "0", "-p", audioPort, "-a", "127.0.0.1", "--server-port", domainPort, "--logOptions=" + logOptions } });
+            { "-t", "0", "-p", audioPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
+    }
+    if (!avatarPort.empty()) {
         servers.push_back({ "avatar-mixer", "avatar", assignmentClientMain,
-            { "-t", "1", "-p", avatarPort, "-a", "127.0.0.1", "--server-port", domainPort, "--logOptions=" + logOptions } });
+            { "-t", "1", "-p", avatarPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
+    }
+    if (!entityPort.empty()) {
         servers.push_back({ "entity-server", "entity", assignmentClientMain,
-            { "-t", "6", "-p", entityPort, "-a", "127.0.0.1", "--server-port", domainPort, "--logOptions=" + logOptions } });
-    } else {
-        std::printf("overte-server: room mode (domain-server only, no domain registration); "
-                    "add --with-mixers to run the audio/avatar/entity servers\n");
+            { "-t", "6", "-p", entityPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
+    }
+    if (!assetsPort.empty()) {
+        servers.push_back({ "asset-server", "assets", assignmentClientMain,
+            { "-t", "3", "-p", assetsPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
     }
 
-    return runChildren(servers);
+    int result = runChildren(servers);
+    cleanupTransientData(dataDir);
+    return result;
 }
 
 } // namespace
@@ -518,37 +729,37 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (sub == "start") {
-        return startSupervisor(argc, argv);
-    }
-
-    // applet dispatch: drop the subcommand token so applet parsers only see their own options
-    char** appletArgv = argv + 1;
-    int appletArgc = argc - 1;
-
-    if (sub == "domain") {
-        return domainServerMain(appletArgc, appletArgv);
-    }
-
-    if (sub == "audio" || sub == "avatar" || sub == "entity") {
-        const char* type = (sub == "audio") ? "0" : (sub == "avatar") ? "1" : "6";
+    // undocumented applet-token dispatch: the Windows supervisor re-runs this
+    // binary with a token in argv[1] so each applet gets its own process. They
+    // run inside the same isolated data dir as the flag mode.
+    if (sub == "domain" || sub == "audio" || sub == "avatar" || sub == "entity" || sub == "assets") {
+        std::string dataDir = findDataDir(argc, argv, 2);
+        if (dataDir.empty()) {
+            // a supervisor-spawned child inherits OVERTE_DATA_DIR; reuse it so
+            // the parent and its applets share one data dir
+            const char* inherited = std::getenv("OVERTE_DATA_DIR");
+            dataDir = (inherited && *inherited) ? inherited : getDataDir();
+        }
+        if (!setupDataDir(dataDir)) {
+            std::fprintf(stderr, "overte-server: cannot prepare data dir %s\n", dataDir.c_str());
+            return 1;
+        }
+        if (sub == "domain") {
+            std::vector<std::string> args;
+            for (int i = 2; i < argc; ++i) {
+                args.push_back(argv[i]);
+            }
+            return runApplet(domainServerMain, "overte-server", args, dataDir);
+        }
+        const char* type = (sub == "audio") ? "0" : (sub == "avatar") ? "1" : (sub == "assets") ? "3" : "6";
         std::vector<std::string> args;
         args.push_back("-t");
         args.push_back(type);
         for (int i = 2; i < argc; ++i) {
             args.push_back(argv[i]);
         }
-        std::vector<char*> argvPtrs;
-        argvPtrs.reserve(args.size() + 1);
-        argvPtrs.push_back(const_cast<char*>("overte-server"));
-        for (auto& arg : args) {
-            argvPtrs.push_back(const_cast<char*>(arg.c_str()));
-        }
-        argvPtrs.push_back(nullptr);
-        return assignmentClientMain((int)argvPtrs.size() - 1, argvPtrs.data());
+        return runApplet(assignmentClientMain, "overte-server", args, dataDir);
     }
 
-    std::fprintf(stderr, "overte-server: unknown subcommand: %s\n", sub.c_str());
-    printUsage(argv[0]);
-    return 1;
+    return flagSupervisor(argc, argv);
 }

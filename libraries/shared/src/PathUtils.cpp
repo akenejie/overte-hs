@@ -145,6 +145,14 @@ QUrl PathUtils::qmlUrl(const QString& relativeUrl) {
 }
 
 QString PathUtils::getAppDataPath() {
+    // The headless multicall launcher pins the whole server state to a single
+    // portable directory (see overte-server/src/main.cpp): config.json, entities/
+    // and assets/ live flat at its root, and QSettings/cache data is redirected
+    // to a transient cache/ subtree via the XDG_* variables.
+    const QString overriddenPath = qEnvironmentVariable("OVERTE_DATA_DIR");
+    if (!overriddenPath.isEmpty()) {
+        return QDir(overriddenPath).absolutePath() + "/";
+    }
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/";
 }
 
