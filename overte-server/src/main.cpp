@@ -25,7 +25,6 @@
 #include <vector>
 #include <climits>
 #include <cctype>
-#include <filesystem>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -34,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <dirent.h>
 #if defined(__linux__)
 #include <sys/prctl.h>
 #endif
@@ -98,12 +98,18 @@ std::string getDataDir() {
     // server state (config, entities, assets) travels with the folder you run the
     // command from, so setups are portable and nothing is written to $HOME, /run
     // or /tmp. Override with --data.
-    std::error_code ec;
-    auto cwd = std::filesystem::current_path(ec);
-    if (ec) {
-        return "data";
+#if defined(_WIN32)
+    char cwdBuf[32768];
+    if (::_getcwd(cwdBuf, (int)sizeof(cwdBuf))) {
+        return std::string(cwdBuf) + "/data";
     }
-    return (cwd / "data").string();
+#else
+    char cwdBuf[PATH_MAX];
+    if (::getcwd(cwdBuf, sizeof(cwdBuf))) {
+        return std::string(cwdBuf) + "/data";
+    }
+#endif
+    return "data";
 }
 
 bool makeDirs(const std::string& path) {
@@ -148,10 +154,10 @@ void setEnv(const char* name, const std::string& value) {
 // ---------------------------------------------------------------------------
 // Data layout
 //
-// The launcher pins the whole server state to one directory (--data-dir, or a
-// 'data' folder next to this executable). Everything a server keeps is written
-// flat into it, and everything transient goes into a cache/ subtree that is
-// removed on shutdown:
+// The launcher pins the whole server state to one directory (--data, or a
+// 'data' folder in the current working directory). Everything a server keeps is
+// written flat into it, and everything transient goes into a cache/ subtree that
+// is removed on shutdown:
 //
 //   <data-dir>/config.json   domain settings (also a directory-independent copy
 //                            source for manual back-ups)
@@ -165,58 +171,197 @@ void setEnv(const char* name, const std::string& value) {
 // XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME variables that point inside it.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Tiny portable filesystem helpers.
+//
+// std::filesystem is deliberately NOT used here: Apple's libc++ marks it
+// unavailable on macOS < 10.15, and the launcher must still build for the
+// project's 10.13 deployment target. The stat/mkdir/rename/readdir split below
+// mirrors makeDirs().
+// ---------------------------------------------------------------------------
+
+bool pathExists(const std::string& path, bool* isDirOut = nullptr) {
+#if defined(_WIN32)
+    DWORD attrs = GetFileAttributesA(path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        return false;
+    }
+    if (isDirOut) {
+        *isDirOut = (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    }
+    return true;
+#else
+    struct stat st;
+    if (::stat(path.c_str(), &st) != 0) {
+        return false;
+    }
+    if (isDirOut) {
+        *isDirOut = S_ISDIR(st.st_mode);
+    }
+    return true;
+#endif
+}
+
+bool isDirectory(const std::string& path) {
+    bool isDir = false;
+    return pathExists(path, &isDir) && isDir;
+}
+
+bool isFile(const std::string& path) {
+    bool isDir = true;
+    return pathExists(path, &isDir) && !isDir;
+}
+
+std::string fileNameOf(const std::string& path) {
+    size_t pos = path.find_last_of("/\\");
+    return (pos == std::string::npos) ? path : path.substr(pos + 1);
+}
+
+bool renamePath(const std::string& from, const std::string& to) {
+#if defined(_WIN32)
+    return MoveFileA(from.c_str(), to.c_str()) != 0;
+#else
+    return ::rename(from.c_str(), to.c_str()) == 0;
+#endif
+}
+
 // Remove a directory tree (never follows symlinks out of the tree).
 void removeTree(const std::string& path) {
-    std::error_code ec;
-    std::filesystem::remove_all(path, ec);
+    if (isDirectory(path)) {
+#if defined(_WIN32)
+        WIN32_FIND_DATAA fd;
+        HANDLE hFind = FindFirstFileA((path + "/*").c_str(), &fd);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (std::strcmp(fd.cFileName, ".") == 0 || std::strcmp(fd.cFileName, "..") == 0) {
+                    continue;
+                }
+                removeTree(path + "/" + fd.cFileName);
+            } while (FindNextFileA(hFind, &fd));
+            FindClose(hFind);
+        }
+        SetFileAttributesA(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+        RemoveDirectoryA(path.c_str());
+#else
+        DIR* dir = ::opendir(path.c_str());
+        if (dir) {
+            struct dirent* entry;
+            while ((entry = ::readdir(dir)) != nullptr) {
+                if (std::strcmp(entry->d_name, ".") == 0 || std::strcmp(entry->d_name, "..") == 0) {
+                    continue;
+                }
+                removeTree(path + "/" + entry->d_name);
+            }
+            ::closedir(dir);
+        }
+        ::rmdir(path.c_str());
+#endif
+        return;
+    }
+    if (pathExists(path)) {
+#if defined(_WIN32)
+        SetFileAttributesA(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+        DeleteFileA(path.c_str());
+#else
+        ::unlink(path.c_str());
+#endif
+    }
 }
 
 // Move a single file into a destination directory; an existing target wins.
-void moveFileInto(const std::filesystem::path& src, const std::filesystem::path& dstDir) {
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(src, ec)) {
+void moveFileInto(const std::string& src, const std::string& dstDir) {
+    if (!isFile(src)) {
         return;
     }
-    std::filesystem::create_directories(dstDir, ec);
-    std::filesystem::path dst = dstDir / src.filename();
-    if (!std::filesystem::exists(dst, ec)) {
-        std::filesystem::rename(src, dst, ec);
+    makeDirs(dstDir);
+    std::string dst = dstDir + "/" + fileNameOf(src);
+    if (!pathExists(dst)) {
+        renamePath(src, dst);
     }
 }
 
 // Move the contents of a source directory into a destination directory.
-void moveDirContentsInto(const std::filesystem::path& srcDir, const std::filesystem::path& dstDir) {
-    std::error_code ec;
-    if (!std::filesystem::is_directory(srcDir, ec)) {
+void moveDirContentsInto(const std::string& srcDir, const std::string& dstDir) {
+    if (!isDirectory(srcDir)) {
         return;
     }
-    std::filesystem::create_directories(dstDir, ec);
-    for (const auto& entry : std::filesystem::directory_iterator(srcDir, ec)) {
-        std::error_code entryEc;
-        std::filesystem::path dst = dstDir / entry.path().filename();
-        if (!std::filesystem::exists(dst, entryEc)) {
-            std::filesystem::rename(entry.path(), dst, entryEc);
-        }
+    makeDirs(dstDir);
+#if defined(_WIN32)
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA((srcDir + "/*").c_str(), &fd);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            if (std::strcmp(fd.cFileName, ".") == 0 || std::strcmp(fd.cFileName, "..") == 0) {
+                continue;
+            }
+            std::string dst = dstDir + "/" + fd.cFileName;
+            if (!pathExists(dst)) {
+                renamePath(srcDir + "/" + fd.cFileName, dst);
+            }
+        } while (FindNextFileA(hFind, &fd));
+        FindClose(hFind);
     }
+#else
+    DIR* dir = ::opendir(srcDir.c_str());
+    if (dir) {
+        struct dirent* entry;
+        while ((entry = ::readdir(dir)) != nullptr) {
+            if (std::strcmp(entry->d_name, ".") == 0 || std::strcmp(entry->d_name, "..") == 0) {
+                continue;
+            }
+            std::string dst = dstDir + "/" + entry->d_name;
+            if (!pathExists(dst)) {
+                renamePath(srcDir + "/" + entry->d_name, dst);
+            }
+        }
+        ::closedir(dir);
+    }
+#endif
 }
 
 // Migrate the pre-flat layout (<dataDir>/data/<organization>/<app>/...) into the
 // flat layout (<dataDir>/config.json, <dataDir>/entities/, <dataDir>/assets/).
 void migrateLegacyData(const std::string& dataDir) {
-    std::error_code ec;
-    const std::filesystem::path legacyRoot(dataDir + "/data");
-    if (std::filesystem::is_directory(legacyRoot, ec)) {
-        for (const auto& orgEntry : std::filesystem::directory_iterator(legacyRoot, ec)) {
-            if (!orgEntry.is_directory(ec)) {
-                continue;
-            }
-            const auto& orgDir = orgEntry.path();
-            moveFileInto(orgDir / "domain-server" / "config.json", dataDir);
-            moveDirContentsInto(orgDir / "domain-server" / "entities", std::filesystem::path(dataDir) / "entities");
-            moveDirContentsInto(orgDir / "assignment-client" / "entities", std::filesystem::path(dataDir) / "entities");
-            moveDirContentsInto(orgDir / "assignment-client" / "assets", std::filesystem::path(dataDir) / "assets");
+    const std::string legacyRoot = dataDir + "/data";
+    if (isDirectory(legacyRoot)) {
+#if defined(_WIN32)
+        WIN32_FIND_DATAA fd;
+        HANDLE hFind = FindFirstFileA((legacyRoot + "/*").c_str(), &fd);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (std::strcmp(fd.cFileName, ".") == 0 || std::strcmp(fd.cFileName, "..") == 0) {
+                    continue;
+                }
+                const std::string orgDir = legacyRoot + "/" + fd.cFileName;
+                if (isDirectory(orgDir)) {
+                    moveFileInto(orgDir + "/domain-server/config.json", dataDir);
+                    moveDirContentsInto(orgDir + "/domain-server/entities", dataDir + "/entities");
+                    moveDirContentsInto(orgDir + "/assignment-client/entities", dataDir + "/entities");
+                    moveDirContentsInto(orgDir + "/assignment-client/assets", dataDir + "/assets");
+                }
+            } while (FindNextFileA(hFind, &fd));
+            FindClose(hFind);
         }
-        removeTree(legacyRoot.string());
+#else
+        DIR* dir = ::opendir(legacyRoot.c_str());
+        if (dir) {
+            struct dirent* entry;
+            while ((entry = ::readdir(dir)) != nullptr) {
+                if (std::strcmp(entry->d_name, ".") == 0 || std::strcmp(entry->d_name, "..") == 0) {
+                    continue;
+                }
+                const std::string orgDir = legacyRoot + "/" + entry->d_name;
+                if (isDirectory(orgDir)) {
+                    moveFileInto(orgDir + "/domain-server/config.json", dataDir);
+                    moveDirContentsInto(orgDir + "/domain-server/entities", dataDir + "/entities");
+                    moveDirContentsInto(orgDir + "/assignment-client/entities", dataDir + "/entities");
+                    moveDirContentsInto(orgDir + "/assignment-client/assets", dataDir + "/assets");
+                }
+            }
+            ::closedir(dir);
+        }
+#endif
+        removeTree(legacyRoot);
     }
     // the old 'start' also created an empty XDG_CONFIG_HOME container here; it
     // only held transient QSettings files, so drop it with the rest
