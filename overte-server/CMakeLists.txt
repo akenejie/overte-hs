@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # overte-server: a multicall single-binary entry point that embeds the
-# domain-server and assignment-client applets (audio/avatar/entity mixers).
-# `overte-server domain|audio|avatar|entity|start ...` dispatches to the
-# corresponding applet; `start` runs the full 4-process VR room stack under
-# one supervisor process.
+# domain-server and assignment-client applets (audio/avatar/entity/
+# entity-script/assets/messages mixers and servers).
+# `overte-server domain|audio|avatar|entity|entity-script|assets|messages
+# <args...>` dispatches to the corresponding applet; the flag mode
+# (`--domain/--audio/--avatar/--entity/--entity-script/--assets/--messages
+# <port>` in any combination) runs the full VR room stack under one
+# supervisor process.
 
 set(TARGET_NAME overte-server)
 

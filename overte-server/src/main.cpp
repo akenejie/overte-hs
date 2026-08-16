@@ -5,12 +5,14 @@
 //  Multicall single-binary entry point for the Overte headless VR room stack.
 //
 //  Usage: start any combination of servers with --domain/--audio/--avatar/
-//  --entity/--assets <port>; the --host/--data/--log-options flags configure
-//  registration target, data directory and logging. See printUsage() below.
+//  --entity/--entity-script/--assets/--messages <port>; the --host/--data/
+//  --log-options flags configure registration target, data directory and
+//  logging. See printUsage() below.
 //
 //  (An undocumented applet-token dispatch - "domain", "audio", "avatar",
-//  "entity", "assets" as argv[1] - is kept as the internal spawn target that
-//  the Windows supervisor uses to re-run this binary per applet.)
+//  "entity", "entity-script", "assets", "messages" as argv[1] - is kept as the
+//  internal spawn target that the Windows supervisor uses to re-run this
+//  binary per applet.)
 //
 //  Distributed under the Apache License, Version 2.0.
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
@@ -56,19 +58,22 @@ void printUsage(const char* prog) {
         "\n"
         "Usage:\n"
         "  %1$s [--domain <port>] [--audio <port>] [--avatar <port>] [--entity <port>]\n"
-        "        [--assets <port>] [--host <host[:port]>] [--data <dir>]\n"
+        "        [--entity-script <port>] [--assets <port>] [--messages <port>]\n"
+        "        [--host <host[:port]>] [--data <dir>]\n"
         "        [--log-options <opts>]\n"
         "  %1$s -h | --help\n"
         "  %1$s --version\n"
         "\n"
         "Run any combination of the Overte servers in one process group. Each --* <port>\n"
         "flag starts that server on the given UDP port:\n"
-        "  --domain <port>   the domain-server (your room). Also makes the other servers\n"
-        "                    register to it at localhost:<port>.\n"
-        "  --audio  <port>   the audio mixer\n"
-        "  --avatar <port>   the avatar mixer\n"
-        "  --entity <port>   the entity server\n"
-        "  --assets <port>   the asset server\n"
+        "  --domain <port>        the domain-server (your room). Also makes the other servers\n"
+        "                         register to it at localhost:<port>.\n"
+        "  --audio  <port>        the audio mixer (voice)\n"
+        "  --avatar <port>        the avatar mixer\n"
+        "  --entity <port>        the entity server (world content)\n"
+        "  --entity-script <port> the entity-script server (scripted/ interactive entities)\n"
+        "  --assets <port>        the asset server (models, textures, scripts)\n"
+        "  --messages <port>      the messages mixer (text chat and script messages)\n"
         "\n"
         "Without --domain the other servers register to an existing domain instead:\n"
         "  --host <host[:port]>  domain address for them. The host defaults to localhost and\n"
@@ -87,6 +92,9 @@ void printUsage(const char* prog) {
         "  %1$s --domain 40102                              # room only\n"
         "  %1$s --domain 40102 --audio 40103 --avatar 40104 \\\n"
         "        --entity 40105 --assets 40106              # full stack\n"
+        "  %1$s --domain 40102 --audio 40103 --avatar 40104 \\\n"
+        "        --entity 40105 --entity-script 40107 --assets 40106 \\\n"
+        "        --messages 40108                           # full stack + chat/scripts\n"
         "  %1$s --entity 40105 --assets 40106 \\\n"
         "        --host 192.168.1.5:40102                   # remote entity+asset servers\n"
         "  %1$s --domain 40102 --host 192.168.1.5           # register mixers to another host\n",
@@ -734,11 +742,11 @@ void splitHostPort(const std::string& value, std::string& host, std::string& por
     port = maybePort;
 }
 
-// Flag-based supervisor: `--domain/--audio/--avatar/--entity/--assets <port>`
-// start servers, `--host`/`--data`/`--log-options` configure them. See
-// printUsage() for the full interface.
+// Flag-based supervisor: `--domain/--audio/--avatar/--entity/--entity-script/
+// --assets/--messages <port>` start servers, `--host`/`--data`/`--log-options`
+// configure them. See printUsage() for the full interface.
 int flagSupervisor(int argc, char* argv[]) {
-    std::string domainPort, audioPort, avatarPort, entityPort, assetsPort;
+    std::string domainPort, audioPort, avatarPort, entityPort, entityScriptPort, assetsPort, messagesPort;
     std::string host;
     std::string dataDir;
     std::string logOptions = "nojournald";
@@ -759,8 +767,12 @@ int flagSupervisor(int argc, char* argv[]) {
             avatarPort = valueOf("--avatar");
         } else if (arg == "--entity") {
             entityPort = valueOf("--entity");
+        } else if (arg == "--entity-script") {
+            entityScriptPort = valueOf("--entity-script");
         } else if (arg == "--assets") {
             assetsPort = valueOf("--assets");
+        } else if (arg == "--messages") {
+            messagesPort = valueOf("--messages");
         } else if (arg == "--host") {
             host = valueOf("--host");
         } else if (arg == "--data") {
@@ -781,9 +793,10 @@ int flagSupervisor(int argc, char* argv[]) {
     }
 
     bool haveAny = !domainPort.empty() || !audioPort.empty() || !avatarPort.empty()
-                || !entityPort.empty() || !assetsPort.empty();
+                || !entityPort.empty() || !entityScriptPort.empty() || !assetsPort.empty()
+                || !messagesPort.empty();
     if (!haveAny) {
-        std::fprintf(stderr, "overte-server: specify at least one of --domain/--audio/--avatar/--entity/--assets\n");
+        std::fprintf(stderr, "overte-server: specify at least one of --domain/--audio/--avatar/--entity/--entity-script/--assets/--messages\n");
         printUsage(argv[0]);
         return 1;
     }
@@ -844,9 +857,17 @@ int flagSupervisor(int argc, char* argv[]) {
         servers.push_back({ "entity-server", "entity", assignmentClientMain,
             { "-t", "6", "-p", entityPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
     }
+    if (!entityScriptPort.empty()) {
+        servers.push_back({ "entity-script-server", "entity-script", assignmentClientMain,
+            { "-t", "5", "-p", entityScriptPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
+    }
     if (!assetsPort.empty()) {
         servers.push_back({ "asset-server", "assets", assignmentClientMain,
             { "-t", "3", "-p", assetsPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
+    }
+    if (!messagesPort.empty()) {
+        servers.push_back({ "messages-mixer", "messages", assignmentClientMain,
+            { "-t", "4", "-p", messagesPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
     }
 
     int result = runChildren(servers);
@@ -877,7 +898,8 @@ int main(int argc, char* argv[]) {
     // undocumented applet-token dispatch: the Windows supervisor re-runs this
     // binary with a token in argv[1] so each applet gets its own process. They
     // run inside the same isolated data dir as the flag mode.
-    if (sub == "domain" || sub == "audio" || sub == "avatar" || sub == "entity" || sub == "assets") {
+    if (sub == "domain" || sub == "audio" || sub == "avatar" || sub == "entity" || sub == "entity-script"
+        || sub == "assets" || sub == "messages") {
         std::string dataDir = findDataDir(argc, argv, 2);
         if (dataDir.empty()) {
             // a supervisor-spawned child inherits OVERTE_DATA_DIR; reuse it so
@@ -896,7 +918,8 @@ int main(int argc, char* argv[]) {
             }
             return runApplet(domainServerMain, "overte-server", args, dataDir);
         }
-        const char* type = (sub == "audio") ? "0" : (sub == "avatar") ? "1" : (sub == "assets") ? "3" : "6";
+        const char* type = (sub == "audio") ? "0" : (sub == "avatar") ? "1" : (sub == "assets") ? "3"
+            : (sub == "messages") ? "4" : (sub == "entity-script") ? "5" : "6";
         std::vector<std::string> args;
         args.push_back("-t");
         args.push_back(type);

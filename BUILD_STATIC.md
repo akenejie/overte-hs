@@ -8,9 +8,9 @@ SPDX-License-Identifier: Apache-2.0
 
 This document describes how to produce **a single, copy-paste deployable binary** for the
 complete Overte headless VR room stack (`domain-server`, `assignment-client` with the
-audio/avatar/entity mixers). The binary depends only on the standard C/C++ runtime (`libc`,
-`libstdc++`, `libgcc_s`, `libm`). No Qt runtime, no system libraries, no installer, no extra
-files.
+audio/avatar/entity/entity-script mixers and the asset/messages servers). The binary depends
+only on the standard C/C++ runtime (`libc`, `libstdc++`, `libgcc_s`, `libm`). No Qt runtime,
+no system libraries, no installer, no extra files.
 
 The build is **self-contained inside this project directory**: static Qt and oneTBB are built
 from source into `<project>/deps/<platform>/`, and the Conan/CMake build tree lives in
@@ -24,10 +24,10 @@ scripts also handle macOS; Windows needs the equivalent steps under MSVC (see
 
 ## Result
 
-A single `overte-server` binary runs the whole five-process stack as a multicall
-(`busybox`-style) executable: `--domain`/`--audio`/`--avatar`/`--entity`/`--assets` flags
-dispatch to the five applets, launched as supervised children. It builds, starts, binds
-all UDP ports and runs together:
+A single `overte-server` binary runs the whole seven-process stack as a multicall
+(`busybox`-style) executable: `--domain`/`--audio`/`--avatar`/`--entity`/`--entity-script`/
+`--assets`/`--messages` flags dispatch to the applets, launched as supervised children. It
+builds, starts, binds all UDP ports and runs together:
 
 ```
 $ ldd overte-server | grep -v vdso
@@ -38,12 +38,15 @@ $ ldd overte-server | grep -v vdso
 	/lib64/ld-linux-x86-64.so.2
 
 $ ./overte-server --domain 41302 --audio 41303 --avatar 41304 \
-                  --entity 41305 --assets 41306
+                  --entity 41305 --entity-script 41307 \
+                  --assets 41306 --messages 41308
 overte-server: starting domain-server
 overte-server: starting audio-mixer
 overte-server: starting avatar-mixer
 overte-server: starting entity-server
+overte-server: starting entity-script-server
 overte-server: starting asset-server
+overte-server: starting messages-mixer
 ```
 
 The `domain` applet serves its settings schema (`describe-settings.json`) from resources
@@ -258,25 +261,28 @@ anymore, so the ordering hazard no longer applies.
 `overte-server/CMakeLists.txt` collects the sources of `domain-server` and
 `assignment-client`, compiles them into one binary and defines `OVERTE_MULTICALL_APPLET`, which
 renames each applet's `main` to `domainServerMain` / `assignmentClientMain`. The dispatcher in
-`overte-server/src/main.cpp` parses the flags (`--domain/--audio/--avatar/--entity/--assets`) and
+`overte-server/src/main.cpp` parses the flags
+(`--domain/--audio/--avatar/--entity/--entity-script/--assets/--messages`) and
 forks the chosen applets as supervised children:
 
 - `overte-server --domain N` — the default room: only the domain server runs; the
-  audio/avatar/entity/asset servers are **not** started and nothing registers to a domain
-- `overte-server --domain N --audio N --avatar N --entity N --assets N` — fork all five
-  applets, supervise them, forward SIGINT/SIGTERM, and shut everything down if any child exits
-  unexpectedly
+  audio/avatar/entity/entity-script/asset/messages servers are **not** started and nothing
+  registers to a domain
+- `overte-server --domain N --audio N --avatar N --entity N --entity-script N --assets N
+  --messages N` — fork all seven applets, supervise them, forward SIGINT/SIGTERM, and shut
+  everything down if any child exits unexpectedly
 - `overte-server --entity N --assets N --host HOST:PORT` — start a subset of servers and
   register them to a remote domain (no local domain)
 - `overte-server --help | --version`
 
-(An undocumented `domain`/`audio`/`avatar`/`entity`/`assets` token in argv[1] also runs a
-single applet directly; the Windows supervisor uses it to spawn one process per applet.)
+(An undocumented `domain`/`audio`/`avatar`/`entity`/`entity-script`/`assets`/`messages` token
+in argv[1] also runs a single applet directly; the Windows supervisor uses it to spawn one
+process per applet.)
 
 Notes:
 - **Domain registration is opt-in.** The default room has no mixers. Only flags such as
-  `--audio`/`--avatar`/`--entity`/`--assets` start those servers and register them to the
-  domain — the classic Overte node registration.
+  `--audio`/`--avatar`/`--entity`/`--entity-script`/`--assets`/`--messages` start those
+  servers and register them to the domain — the classic Overte node registration.
 - `SKIP_AUTOMOC`/`AssetsBackupHandler.h` no longer exist: the class was deleted with the web
   stack it served.
 - `resources.qrc` embeds `domain-server/resources/describe-settings.json` under `:/resources/`,
