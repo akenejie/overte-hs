@@ -16,9 +16,8 @@
 
 #include <QVariantMap>
 #include <QJsonObject>
-#include "HTTPManager.h"
 
-class DomainMetadata : public QObject, public HTTPRequestHandler {
+class DomainMetadata : public QObject {
 Q_OBJECT
 
 public:
@@ -52,8 +51,6 @@ public:
     // Get cached metadata
     QJsonObject get();
     QJsonObject get(const QString& group);
-
-    bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler = false) override;
 
 public slots:
     void descriptorsChanged();

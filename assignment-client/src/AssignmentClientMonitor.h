@@ -23,10 +23,6 @@
 #include <Assignment.h>
 
 #include "AssignmentClientChildData.h"
-#ifndef OVERTE_HEADLESS
-#include <HTTPManager.h>
-#include <HTTPConnection.h>
-#endif
 
 extern const char* NUM_FORKS_PARAMETER;
 
@@ -37,16 +33,13 @@ struct ACProcess {
 };
 
 class AssignmentClientMonitor : public QObject
-#ifndef OVERTE_HEADLESS
-    , public HTTPRequestHandler
-#endif
 {
     Q_OBJECT
 public:
     AssignmentClientMonitor(const unsigned int numAssignmentClientForks, const unsigned int minAssignmentClientForks,
                             const unsigned int maxAssignmentClientForks, Assignment::Type requestAssignmentType,
                             QString assignmentPool, quint16 listenPort, quint16 childMinListenPort,
-                            QString assignmentServerHostname, quint16 assignmentServerPort, quint16 httpStatusServerPort,
+                            QString assignmentServerHostname, quint16 assignmentServerPort,
                             QString logDirectory, bool disableDomainPortAutoDiscovery, QString logOptions);
     ~AssignmentClientMonitor();
 
@@ -56,9 +49,6 @@ private slots:
     void childProcessFinished(qint64 pid, quint16 port, int exitCode, QProcess::ExitStatus exitStatus);
     void handleChildStatusPacket(QSharedPointer<ReceivedMessage> message);
 
-#ifndef OVERTE_HEADLESS
-    bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler = false) override;
-#endif
 
 public slots:
     void aboutToQuit();
@@ -72,9 +62,6 @@ private:
 
     QDir _logDirectory;
 
-#ifndef OVERTE_HEADLESS
-    HTTPManager _httpManager;
-#endif
 
     const unsigned int _numAssignmentClientForks;
     const unsigned int _minAssignmentClientForks;

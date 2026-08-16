@@ -42,11 +42,8 @@ AssignmentClientMonitor::AssignmentClientMonitor(const unsigned int numAssignmen
                                                  const unsigned int maxAssignmentClientForks,
                                                  Assignment::Type requestAssignmentType, QString assignmentPool,
                                                  quint16 listenPort, quint16 childMinListenPort, QString assignmentServerHostname,
-                                                 quint16 assignmentServerPort, quint16 httpStatusServerPort, QString logDirectory,
+                                                 quint16 assignmentServerPort, QString logDirectory,
                                                  bool disableDomainPortAutoDiscovery, QString logOptions) :
-#ifndef OVERTE_HEADLESS
-    _httpManager(QHostAddress::LocalHost, httpStatusServerPort, "", this),
-#endif
     _numAssignmentClientForks(numAssignmentClientForks),
     _minAssignmentClientForks(minAssignmentClientForks),
     _maxAssignmentClientForks(maxAssignmentClientForks),
@@ -386,36 +383,6 @@ void AssignmentClientMonitor::handleChildStatusPacket(QSharedPointer<ReceivedMes
     }
 }
 
-#ifndef OVERTE_HEADLESS
-bool AssignmentClientMonitor::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
-    if (url.path() == "/status") {
-        QByteArray response;
-
-        QJsonObject status;
-        QJsonObject servers;
-        for (auto& ac : _childProcesses) {
-            QJsonObject server;
-
-            server["pid"] = ac.process->processId();
-            server["logStdout"] = ac.logStdoutPath;
-            server["logStderr"] = ac.logStderrPath;
-
-            servers[QString::number(ac.process->processId())] = server;
-        }
-
-        status["servers"] = servers;
-
-        QJsonDocument document { status };
-
-        connection->respond(HTTPConnection::StatusCode200, document.toJson());
-    } else {
-        connection->respond(HTTPConnection::StatusCode404);
-    }
-
-
-    return true;
-}
-#endif // OVERTE_HEADLESS
 
 void AssignmentClientMonitor::adjustOSResources(unsigned int numForks) const
 {

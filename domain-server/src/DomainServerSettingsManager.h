@@ -20,7 +20,6 @@
 #include <QtCore/QSharedPointer>
 
 #include <HifiConfigVariantMap.h>
-#include <HTTPManager.h>
 #include <Node.h>
 #include <ReceivedMessage.h>
 
@@ -76,8 +75,6 @@ class DomainServerSettingsManager : public QObject {
     Q_OBJECT
 public:
     DomainServerSettingsManager();
-    bool handleAuthenticatedHTTPRequest(HTTPConnection* connection, const QUrl& url);
-
 
     /**
      * @brief Loads the configuration from the specified file

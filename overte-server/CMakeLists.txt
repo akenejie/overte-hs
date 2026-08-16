@@ -40,29 +40,13 @@ add_executable(${TARGET_NAME} ${OVERTE_SERVER_OWN_SRCS} ${OVERTE_SERVER_DS_SRCS}
 # the multicall applet mains are renamed from `main` via this define
 target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_MULTICALL_APPLET)
 
-# AssetsBackupHandler methods are compiled out in headless builds; matching the
-# domain-server target, do not generate moc for it or its vtable will reference
-# symbols that do not exist.
-if (OVERTE_HEADLESS)
-  set_source_files_properties(
-    "${CMAKE_SOURCE_DIR}/domain-server/src/AssetsBackupHandler.h"
-    PROPERTIES SKIP_AUTOMOC ON
-  )
-endif()
+target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_HEADLESS QT_CORE_LIB QT_GUI_LIB)
+find_package(Qt5 COMPONENTS Core QUIET)
+target_link_libraries(${TARGET_NAME} Qt5::Core)
 
-if (OVERTE_HEADLESS)
-  target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_HEADLESS QT_CORE_LIB QT_GUI_LIB)
-  find_package(Qt5 COMPONENTS Core QUIET)
-  target_link_libraries(${TARGET_NAME} Qt5::Core)
-else()
-  find_package(Qt5 COMPONENTS Core Gui Network Quick WebSockets QUIET REQUIRED)
-  target_link_libraries(${TARGET_NAME} Qt5::Core Qt5::Gui Qt5::Network Qt5::Quick Qt5::WebSockets)
-endif()
-
-# generated app version header and the compat HTTPManager stub
+# generated app version header
 target_include_directories(${TARGET_NAME} PRIVATE
   "${CMAKE_BINARY_DIR}/includes"
-  "${CMAKE_SOURCE_DIR}/compat"
   "${CMAKE_SOURCE_DIR}/domain-server/src"
   "${CMAKE_SOURCE_DIR}/assignment-client/src"
 )
@@ -93,8 +77,6 @@ if (UNIX)
 endif ()
 
 target_link_libraries(${TARGET_NAME} ${CMAKE_THREAD_LIBS_INIT})
-
-target_quazip()
 
 add_crashpad()
 target_breakpad()

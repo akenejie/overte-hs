@@ -26,7 +26,6 @@ const QString ASSIGNMENT_NUM_FORKS_OPTION = "n";
 const QString ASSIGNMENT_MIN_FORKS_OPTION = "min";
 const QString ASSIGNMENT_MAX_FORKS_OPTION = "max";
 const QString ASSIGNMENT_CLIENT_MONITOR_PORT_OPTION = "monitor-port";
-const QString ASSIGNMENT_HTTP_STATUS_PORT = "http-status-port";
 const QString ASSIGNMENT_LOG_DIRECTORY = "log-directory";
 const QString ASSIGNMENT_DISABLE_DOMAIN_AUTO_PORT_DISCOVERY = "disable-domain-port-auto-discovery";
 const QString ASSIGNMENT_LOG_OPTIONS = "logOptions";

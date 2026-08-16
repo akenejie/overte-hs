@@ -10,18 +10,14 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 
 #include "DomainMetadata.h"
-#include "HTTPConnection.h"
 
 #include <AccountManager.h>
 #include <DependencyManager.h>
 #include <HifiConfigVariantMap.h>
 #include <LimitedNodeList.h>
-#include <QLoggingCategory>
 
 #include "DomainServer.h"
 #include "DomainServerNodeData.h"
-
-Q_LOGGING_CATEGORY(domain_metadata_exporter, "hifi.domain_server.metadata_exporter")
 
 const QString DomainMetadata::USERS = "users";
 const QString DomainMetadata::Users::NUM_TOTAL = "num_users";
@@ -248,21 +244,3 @@ void DomainMetadata::sendDescriptors() {
     }
 }
 
-bool DomainMetadata::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
-    QString domainMetadataJSON = QString("{\"domain\":{\"meta\":%1}, \"users\":%2}")
-                                     .arg(QString(QJsonDocument(get(DESCRIPTORS)).toJson(QJsonDocument::Compact)))
-                                     .arg(QString(QJsonDocument(get(USERS)).toJson(QJsonDocument::Compact)));
-    const QString URI_METADATA = "/metadata";
-    const QString EXPORTER_MIME_TYPE = "application/json";
-
-    if (url.path() == URI_METADATA) {
-        connection->respond(HTTPConnection::StatusCode200, domainMetadataJSON.toUtf8(), qPrintable(EXPORTER_MIME_TYPE));
-        return true;
-    }
-
-#if DEV_BUILD || PR_BUILD
-    qCDebug(domain_metadata_exporter) << "Metadata request on URL " << url;
-#endif
-
-    return false;
-}

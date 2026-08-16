@@ -191,8 +191,7 @@ These are local patches to the Overte source (the exact files in this working tr
 | `CMakeLists.txt` | headless branch: `add_definitions(-DOVERTE_HEADLESS -DOVERTE_NO_QTWEBSOCKET)` so every target gets both defines |
 | `libraries/shared/src/GLMHelpers.h` | declare `vec3 toGlm(const glm::u8vec3&)` (was defined but never declared) |
 | `libraries/entities/src/EntityScriptingInterface.h` | guard `#include <QtQml/QJSValue>` / `QJSValueList` with `#ifndef OVERTE_HEADLESS` (headless Qt has no QtQml) |
-| `assignment-client/src/octree/OctreeServer.h` | drop the headless guard on `#include <HTTPManager.h>` (the `compat/` stub provides it) |
-| `assignment-client/src/octree/OctreeServer.cpp` | guard the `_httpManager(nullptr)` member initializer with `#ifndef OVERTE_HEADLESS` |
+| `assignment-client/src/octree/OctreeServer.cpp` | the status HTTP server (`initHTTPManager`/`handleHTTPRequest`) and the `_httpManager` member were removed outright |
 | `libraries/image/src/image/TextureProcessing.cpp` | move `convertToFloatFromPacked` / `convertToPackedFromFloat` outside the `NVTT_API` guard; add headless stubs for `convertImageToTexture` / `convertToTextureWithMips` / `convertToTexture` |
 | `libraries/script-engine/src/ScriptManager.cpp` | guard `#include <QtConcurrent/QtConcurrentRun>`; `getLocalEntityScriptDetails` uses a synchronous `QFutureInterface<QVariant>` in headless; guard the `WebSocketClass.h` include |
 | `libraries/script-engine/src/ScriptEngines.cpp` | guard `#include <QtConcurrent/QtConcurrent>`; `stopAllScripts` detaches a `std::thread` in headless |
@@ -208,15 +207,19 @@ These are local patches to the Overte source (the exact files in this working tr
 | `libraries/shaders/CMakeLists.txt` + `src/shaders/ShadersHeadless.cpp` | headless: run `autoscribe_shader_libs(...)` (configure-time only; produces the full `ShaderEnums.h`) but compile the minimal `ShadersHeadless.cpp` instead of the scribe outputs. The `scribed_shaders`/`shadergen` targets are created but never built (nothing depends on them), so no glslang/scribe binaries are needed |
 | `libraries/script-engine/src/HelperScriptEngine.{h,cpp}` | tolerate a null `newScriptEngine()` (headless has no V8): constructor skips the thread, `run()`/`runWithResult()` become no-ops |
 | `domain-server/CMakeLists.txt` | copy `resources/` beside the binary in headless too (the settings schema default `metaverse.local_port=40102` lives there) |
-| `ice-server/CMakeLists.txt` | restore the real build; headless: link `networking shared`, add the `compat/` include dir, keep OpenSSL, drop `embedded-webserver` (needs Qt SSL) |
+| `ice-server/CMakeLists.txt` | restore the real build; headless: link `networking shared`, keep OpenSSL (RSA domain-key verification), no `embedded-webserver` |
 
 Rationale:
 - `QDataStream` / `QSslConfiguration` were previously pulled in transitively by QtGui headers;
   a static Qt without SSL exposes them as missing.
 - Headless Qt is built `--no-feature-concurrent` and without QtWebSockets/QtQml, so every
   `QtConcurrent::run` / `WebSocket*` / `QtQml` use must be guarded.
-- `embedded-webserver` compiles `HTTPSManager.cpp`/`HTTPSConnection.cpp` which need Qt SSL
-  (`QSslError`); headless uses the `compat/HTTPManager.h` stubs instead.
+- The embedded web UI was **removed outright**: the admin console (`domain-server/resources/web/`),
+  the HTTP/HTTPS servers, OAuth, content backup/export handlers, the status HTTP servers of the
+  octree servers and the assignment-client monitor, the `embedded-webserver` library, and the
+  `compat/` HTTP/quazip stubs no longer exist in the source. Nothing listens on 40100/40101
+  (HTTP/HTTPS admin ports). The metaverse heartbeat (which still reports user counts via
+  `DomainMetadata`) uses `QNetworkAccessManager` through the `networking` library.
 - In non-headless builds `ShaderEnums.h` is generated from the shader sources at configure
   time and the scribe tools compile them at build time. In headless the enum generation is
   still run at configure time (pure CMake string processing — no tool needed) so that
@@ -246,10 +249,9 @@ cmake --build build --target overte-server -j$(nproc)
 file build/overte-server/overte-server   # ... stripped
 ```
 
-The strip block must stay **before** `target_quazip()` in `overte-server/CMakeLists.txt`: in
-headless builds `TARGET_QUAZIP` runs `return()` from inside a macro, and since macros expand
-inline that `return()` exits the whole CMakeLists — anything placed after `target_quazip()` is
-dead code.
+`target_quazip()` (which `return()`s early in headless builds, exiting the whole macro inline)
+was removed along with the content-backup handlers; nothing after the strip block returns early
+anymore, so the ordering hazard no longer applies.
 
 ## 4. The `overte-server` multicall target
 
@@ -275,9 +277,8 @@ Notes:
 - **Domain registration is opt-in.** The default room has no mixers. Only flags such as
   `--audio`/`--avatar`/`--entity`/`--assets` start those servers and register them to the
   domain — the classic Overte node registration.
-- `SKIP_AUTOMOC ON` in headless mode for `AssetsBackupHandler.h`: the class body disappears
-  under `OVERTE_HEADLESS`, and generating a moc file for it would leave an undefined vtable
-  reference.
+- `SKIP_AUTOMOC`/`AssetsBackupHandler.h` no longer exist: the class was deleted with the web
+  stack it served.
 - `resources.qrc` embeds `domain-server/resources/describe-settings.json` under `:/resources/`,
   and `DomainServerSettingsManager` falls back to it when the file is absent on disk.
 - Every server runs inside one data directory (the `data/` folder in the current working
@@ -350,8 +351,8 @@ and exits with status 1, instead of leaving a half-running stack.
 
 ## Limitations
 
-- **No SSL in Qt** (`QT_NO_SSL`). TLS-dependent server features are disabled/guarded;
-  `embedded-webserver` is not built in headless mode.
+- **No SSL in Qt** (`QT_NO_SSL`). TLS-dependent server features are disabled/guarded; the
+  `embedded-webserver` library (which needed Qt SSL for its HTTPS manager) was deleted outright.
 - **No OpenGL / windowing**: Qt is built `-no-opengl -no-xcb`; GUI drawing is limited to the
   software `QPainter`/`QImage` raster pipeline.
 - **No QtWebSockets / QtQml / QtConcurrent** — expected for a headless server. Anything that

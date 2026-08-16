@@ -205,8 +205,6 @@ if (OVERTE_HEADLESS)
     set(OVERTE_BUILD_CLIENT OFF CACHE BOOL "" FORCE)
     set(OVERTE_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
     set(OVERTE_BUILD_INSTALLER OFF CACHE BOOL "" FORCE)
-    # Add compat layer include path globally
-    include_directories(BEFORE "${CMAKE_SOURCE_DIR}/compat")
 endif()
 
 if (OVERTE_DISABLE_KTX_CACHE)

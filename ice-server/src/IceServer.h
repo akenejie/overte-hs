@@ -21,8 +21,6 @@
 #include <UUIDHasher.h>
 
 #include <NetworkPeer.h>
-#include <HTTPConnection.h>
-#include <HTTPManager.h>
 #include <NLPacket.h>
 #include <udt/Socket.h>
 
