@@ -33,7 +33,6 @@
 #include "ScriptEngineCast.h"
 #include "ScriptValueIterator.h"
 #include "ScriptEngineLogging.h"
-#include "v8/FastScriptValueUtils.h"
 #include "AddressManager.h"
 #include "Sampler.h"
 
@@ -183,7 +182,6 @@ bool vec2FromScriptValue(const ScriptValue& object, glm::vec2& vec2) {
     return true;
 }
 
-#ifndef CONVERSIONS_OPTIMIZED_FOR_V8
 ScriptValue qBytearrayToScriptValue(ScriptEngine* engine, const QByteArray &qByteArray) {
     return engine->newArrayBuffer(qByteArray);
 }
@@ -196,9 +194,7 @@ bool qBytearrayFromScriptValue(const ScriptValue& object, QByteArray &qByteArray
     }
     return false;
 }
-#endif
 
-#ifndef CONVERSIONS_OPTIMIZED_FOR_V8
 ScriptValue vec3ToScriptValue(ScriptEngine* engine, const glm::vec3& vec3) {
     auto prototype = engine->globalObject().property("__hifi_vec3__");
     if (!prototype.hasProperty("defined") || !prototype.property("defined").toBool()) {
@@ -223,7 +219,6 @@ ScriptValue vec3ToScriptValue(ScriptEngine* engine, const glm::vec3& vec3) {
     value.setPrototype(prototype);
     return value;
 }
-#endif
 
 ScriptValue vec3ColorToScriptValue(ScriptEngine* engine, const glm::vec3& vec3) {
     auto prototype = engine->globalObject().property("__hifi_vec3_color__");
@@ -251,7 +246,6 @@ ScriptValue vec3ColorToScriptValue(ScriptEngine* engine, const glm::vec3& vec3) 
 }
 
 // V8TODO: add similar checks to rest of the conversions
-#ifndef CONVERSIONS_OPTIMIZED_FOR_V8
 bool vec3FromScriptValue(const ScriptValue& object, glm::vec3& vec3) {
     if (object.isNumber()) {
         vec3 = glm::vec3(object.toVariant().toFloat());
@@ -311,7 +305,6 @@ bool vec3FromScriptValue(const ScriptValue& object, glm::vec3& vec3) {
     }
     return true;
 }
-#endif
 
 ScriptValue u8vec3ToScriptValue(ScriptEngine* engine, const glm::u8vec3& vec3) {
     auto prototype = engine->globalObject().property("__hifi_u8vec3__");

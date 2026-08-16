@@ -19,7 +19,6 @@
 #include "ScriptValue.h"
 #include "ScriptManager.h"
 #include "ScriptValueUtils.h"
-#include "v8/FastScriptValueUtils.h"
 
 STATIC_SCRIPT_TYPES_INITIALIZER((+[](ScriptManager* manager){
     auto scriptEngine = manager->engine().get();

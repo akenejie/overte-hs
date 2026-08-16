@@ -26,9 +26,6 @@
 #include "ScriptValue.h"
 #include "ScriptException.h"
 
-// These are used for debugging memory leaks caused by persistent handles
-//#define OVERTE_V8_MEMORY_DEBUG
-
 class QByteArray;
 class QLatin1String;
 class QString;
@@ -58,12 +55,6 @@ public:
     size_t totalAvailableSize;
     size_t totalGlobalHandlesSize;
     size_t usedGlobalHandlesSize;
-#ifdef OVERTE_V8_MEMORY_DEBUG
-    size_t scriptValueCount;
-    size_t scriptValueProxyCount;
-    size_t qObjectCount;
-    //size_t qVariantProxyCount;
-#endif
 };
 
 /**
@@ -408,7 +399,6 @@ public:
 
     /**
      * @brief Tells the script engine to process any events it may have queued internally.
-     * Used by V8 for async functions and WebAssembly compilation.
      */
     virtual void processEvents() = 0;
 

@@ -1,6 +1,6 @@
 //
 //  ScriptMessage.h
-//  libraries/script-engine/src/v8/FastScriptValueUtils.cpp
+//  libraries/script-engine/src
 //
 //  Created by dr Karol Suprynowicz on 2023/09/24.
 //  Copyright 2023 Overte e.V.

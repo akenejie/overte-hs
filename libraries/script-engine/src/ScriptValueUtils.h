@@ -194,6 +194,10 @@ class QUrl;
 ScriptValue qURLToScriptValue(ScriptEngine* engine, const QUrl& url);
 bool qURLFromScriptValue(const ScriptValue& object, QUrl& url);
 
+class QByteArray;
+ScriptValue qBytearrayToScriptValue(ScriptEngine* engine, const QByteArray& qByteArray);
+bool qBytearrayFromScriptValue(const ScriptValue& object, QByteArray& qByteArray);
+
 // vector<vec3>
 Q_DECLARE_METATYPE(QVector<glm::vec3>)
 ScriptValue qVectorVec3ToScriptValue(ScriptEngine* engine, const QVector<glm::vec3>& vector);

@@ -529,8 +529,8 @@ public:
      *     <tr><td><code>totalHeapSize</code></td><td>{number}</td><td>Total heap size allocated by scripting engine.</td></tr>
      *     <tr><td><code>usedHeapSize</code></td><td>{number}</td><td></td>Amount of heap memory that is currently in use.</tr>
      *     <tr><td><code>totalAvailableSize</code></td><td>{number}</td><td>Amount of remaining available heap memory</td></tr>
-     *     <tr><td><code>totalGlobalHandlesSize</code></td><td>{number}</td><td>V8-specific property</td></tr>
-     *     <tr><td><code>usedGlobalHandlesSize</code></td><td>{number}</td><td>V8-specific property</td></tr>
+     *     <tr><td><code>totalGlobalHandlesSize</code></td><td>{number}</td><td>Size of the engine's interned-atom table.</td></tr>
+     *     <tr><td><code>usedGlobalHandlesSize</code></td><td>{number}</td><td>Amount of memory used by engine interned strings.</td></tr>
      *   </tbody>
      * </table>
      * @typedef {object} Script.MemoryUsageData

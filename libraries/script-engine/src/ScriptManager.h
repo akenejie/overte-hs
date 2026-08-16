@@ -1270,7 +1270,7 @@ public:
     /**
      * @brief Adds `console` namespace with functions such as `console.log`.
      *
-     * Called during script manager registration and in `ScriptEngineV8::evaluateInClosure`, which happens during
+     * Called during script manager registration and in `ScriptEngineQJS::evaluateInClosure`, which happens during
      * `Script.require` call.
      * @param scopeGuard Pointer to a script engine scope guard.
      * @param scriptEngine Pointer to the script engine to which `console` namespace will be added.
@@ -1502,7 +1502,7 @@ signals:
     void releaseEntityPacketSenderMessages(bool wait);
 
 protected:
-    // Is called by the constructor, bceause all types need to be registered before method discovery with ScriptObjectV8Proxy::investigate()
+    // Is called by the constructor, because all types need to be registered before QObject method discovery.
     void initMetaTypes();
 
     /**

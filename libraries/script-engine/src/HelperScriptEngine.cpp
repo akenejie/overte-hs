@@ -17,7 +17,7 @@ HelperScriptEngine::HelperScriptEngine() {
     std::lock_guard<std::mutex> lock(_scriptEngineLock);
     _scriptEngine = newScriptEngine();
     if (!_scriptEngine) {
-        // Headless builds have no scripting backend (no V8). All helper
+        // Failure to create a scripting engine is unexpected; all helper
         // operations become no-ops so the entity tree can still be used for
         // packet-based entity networking.
         return;

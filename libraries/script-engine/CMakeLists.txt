@@ -19,12 +19,6 @@ if (OVERTE_HEADLESS)
         src/WebSocketServerClass.h
         PROPERTIES HEADER_FILE_ONLY TRUE SKIP_AUTOMOC TRUE
     )
-    # Headless servers do not link libnode (V8). Exclude the V8 sources from
-    # compilation so the library builds without the v8 headers.
-    file(GLOB V8_SRCS "src/v8/*.h" "src/v8/*.cpp")
-    if (V8_SRCS)
-        set_source_files_properties(${V8_SRCS} PROPERTIES HEADER_FILE_ONLY TRUE SKIP_AUTOMOC TRUE)
-    endif()
 endif()
 
 link_hifi_libraries(networking)
@@ -32,7 +26,6 @@ include_hifi_library_headers(octree)
 include_hifi_library_headers(shared)
 
 target_zlib()
-target_v8()
 if (NOT ANDROID)
   target_quazip()
 endif ()

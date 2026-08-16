@@ -18,17 +18,12 @@
 
 #include "ScriptEngineLogging.h"
 #include "ScriptValue.h"
-#if !defined(OVERTE_HEADLESS)
-#include "v8/ScriptEngineV8.h"
-#endif
+#include "qjs/ScriptEngineQJS.h"
 
 ScriptEnginePointer newScriptEngine(ScriptManager* manager) {
-#if defined(OVERTE_HEADLESS)
-    // Headless servers do not link libnode (V8) and do not run server-side scripts.
-    return nullptr;
-#else
-    return std::make_shared<ScriptEngineV8>(manager);
-#endif
+    // QJS (QuickJS) is the script engine. It is self-contained and does not
+    // depend on a specific build configuration or runtime environment.
+    return newScriptEngineQJS(manager);
 }
 
 ScriptValue makeScopedHandlerObject(const ScriptValue& scopeOrCallback, const ScriptValue& methodOrName) {
