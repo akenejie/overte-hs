@@ -246,12 +246,30 @@ typedef struct JSValue {
 
 /* avoid uninitialized data by using a 64 bit field even if only 32
    bits are needed because some compilers generate slower code */
+#ifdef _MSC_VER
+static inline JSValue js_mkval(int tag, uint32_t val) {
+    JSValue v; v.u.uint64 = val; v.tag = tag; return v;
+}
+static inline JSValue js_mkptr(int tag, void *p) {
+    JSValue v; v.u.ptr = p; v.tag = tag; return v;
+}
+#define JS_MKVAL(tag, val) js_mkval(tag, (uint32_t)(val))
+#define JS_MKPTR(tag, p) js_mkptr(tag, p)
+#else
 #define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .uint64 = (uint32_t)(val) }, tag }
 #define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag }
+#endif
 
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
 
+#ifdef _MSC_VER
+static inline JSValue js_nan(void) {
+    JSValue v; v.u.float64 = JS_FLOAT64_NAN; v.tag = JS_TAG_FLOAT64; return v;
+}
+#define JS_NAN js_nan()
+#else
 #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
+#endif
 
 static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 {
