@@ -233,7 +233,11 @@ typedef struct JSValue {
     int64_t tag;
 } JSValue;
 
+#ifdef _MSC_VER
+typedef const JSValue JSValueConst;
+#else
 #define JSValueConst JSValue
+#endif
 
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */

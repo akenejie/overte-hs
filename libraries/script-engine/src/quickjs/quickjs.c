@@ -71,7 +71,7 @@ static int gettimeofday(struct timeval *tp, void *tzp) {
 
 #define OPTIMIZE         1
 #define SHORT_OPCODES    1
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || defined(_MSC_VER)
 #define DIRECT_DISPATCH  0
 #else
 #define DIRECT_DISPATCH  1
