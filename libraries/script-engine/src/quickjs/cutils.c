@@ -174,8 +174,8 @@ int dbuf_putstr(DynBuf *s, const char *str)
     return dbuf_put(s, (const uint8_t *)str, strlen(str));
 }
 
-int __attribute__((format(printf, 2, 3))) dbuf_printf(DynBuf *s,
-                                                      const char *fmt, ...)
+CUTILS_PRINTF_ATTR(2, 3) int dbuf_printf(DynBuf *s,
+                                        const char *fmt, ...)
 {
     va_list ap;
     char buf[128];
