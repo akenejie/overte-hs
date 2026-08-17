@@ -233,10 +233,16 @@ typedef struct JSValue {
     int64_t tag;
 } JSValue;
 
-#ifdef _MSC_VER
-typedef const JSValue JSValueConst;
-#else
 #define JSValueConst JSValue
+
+/* MSVC rejects identity casts like (JSValue)name when JSValueConst == JSValue.
+   These macros perform the cast only when the types actually differ. */
+#ifdef _MSC_VER
+#define JS_FROM_CONST(v) (v)
+#define JS_TO_CONST(v)   (v)
+#else
+#define JS_FROM_CONST(v) (JSValue)(v)
+#define JS_TO_CONST(v)   (JSValueConst)(v)
 #endif
 
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
