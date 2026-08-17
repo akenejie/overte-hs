@@ -235,16 +235,6 @@ typedef struct JSValue {
 
 #define JSValueConst JSValue
 
-/* MSVC rejects identity casts like (JSValue)name when JSValueConst == JSValue.
-   These macros perform the cast only when the types actually differ. */
-#ifdef _MSC_VER
-#define JS_FROM_CONST(v) (v)
-#define JS_TO_CONST(v)   (v)
-#else
-#define JS_FROM_CONST(v) (JSValue)(v)
-#define JS_TO_CONST(v)   (JSValueConst)(v)
-#endif
-
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
 #define JS_VALUE_GET_NORM_TAG(v) JS_VALUE_GET_TAG(v)
@@ -310,6 +300,16 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int64_t d)
 }
 
 #endif /* !JS_NAN_BOXING */
+
+/* MSVC rejects identity casts like (JSValue)name when JSValueConst == JSValue.
+   These macros perform the cast only when the types actually differ. */
+#ifdef _MSC_VER
+#define JS_FROM_CONST(v) (v)
+#define JS_TO_CONST(v)   (v)
+#else
+#define JS_FROM_CONST(v) (JSValue)(v)
+#define JS_TO_CONST(v)   (JSValueConst)(v)
+#endif
 
 #define JS_VALUE_IS_BOTH_INT(v1, v2) ((JS_VALUE_GET_TAG(v1) | JS_VALUE_GET_TAG(v2)) == 0)
 #define JS_VALUE_IS_BOTH_FLOAT(v1, v2) (JS_TAG_IS_FLOAT64(JS_VALUE_GET_TAG(v1)) && JS_TAG_IS_FLOAT64(JS_VALUE_GET_TAG(v2)))
