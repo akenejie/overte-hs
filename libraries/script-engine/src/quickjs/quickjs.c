@@ -47209,6 +47209,20 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
     return __JS_NewFloat64(ctx, u.d - 1.0);
 }
 
+#if defined(_MSC_VER)
+/* MSVC treats standard math functions as compiler intrinsics.  When an
+   intrinsic is referenced by name (not called) as a function pointer in a
+   static aggregate initializer, MSVC does not treat its address as a
+   constant expression, causing error C2099.  Temporarily disable the
+   intrinsics so the linker resolves real library symbols (address
+   constants).  This block is compiled only on MSVC; Linux/darwin are
+   unaffected. */
+#pragma function(fabs, floor, ceil, sqrt, \
+                 acos, asin, atan, atan2, \
+                 cos, exp, log, sin, tan, trunc, \
+                 cosh, sinh, tanh, acosh, asinh, atanh, \
+                 expm1, log1p, log2, log10, cbrt)
+#endif
 static JS_DATA_DEF JSCFunctionListEntry js_math_funcs[] = {
     JS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0 ),
     JS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1 ),
@@ -47259,6 +47273,15 @@ static JS_DATA_DEF JSCFunctionListEntry js_math_funcs[] = {
     JS_PROP_DOUBLE_DEF("SQRT1_2", 0.7071067811865476, 0 ),
     JS_PROP_DOUBLE_DEF("SQRT2", 1.4142135623730951, 0 ),
 };
+#if defined(_MSC_VER)
+/* Restore intrinsics for the rest of the file so that direct calls to these
+   math functions remain inlined/fast. */
+#pragma intrinsic(fabs, floor, ceil, sqrt, \
+                  acos, asin, atan, atan2, \
+                  cos, exp, log, sin, tan, trunc, \
+                  cosh, sinh, tanh, acosh, asinh, atanh, \
+                  expm1, log1p, log2, log10, cbrt)
+#endif
 
 static JS_DATA_DEF JSCFunctionListEntry js_math_obj[] = {
     JS_OBJECT_DEF("Math", js_math_funcs, countof(js_math_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
