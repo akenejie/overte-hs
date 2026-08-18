@@ -4,22 +4,19 @@
 
 set(TARGET_NAME script-engine)
 
-# quickjs.c uses C99 designated initializers (e.g., .u = { .func = { ... } })
-# MSVC defaults to C89; enable C11 for this target's C sources.
-if (MSVC)
-    set_source_files_properties(
-        src/quickjs/quickjs.c
-        src/quickjs/cutils.c
-        src/quickjs/dtoa.c
-        src/quickjs/libregexp.c
-        src/quickjs/libunicode.c
-        PROPERTIES COMPILE_FLAGS "/std:c11"
-    )
-endif()
-
-
 # FIXME Move undo scripting interface to application and remove Widgets
 setup_hifi_library(Network)
+
+# quickjs.c uses C99 designated initializers (e.g., .u = { .func = { ... } })
+# and function designators as constant expressions in static initializers.
+# MSVC defaults to C89; enable C11 or later for this target's C sources.
+# Use target_compile_options (after setup_hifi_library creates the target)
+# so the flag is reliably applied to all C compilations in this target.
+if (MSVC)
+    target_compile_options(${TARGET_NAME} PRIVATE
+        $<$<COMPILE_LANGUAGE:C>:/std:c11>
+    )
+endif()
 if (OVERTE_HEADLESS)
     target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_NO_QTWEBSOCKET)
     # QtWebSockets is not built in the headless Qt. Exclude the WebSocket
