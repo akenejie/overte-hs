@@ -1141,10 +1141,12 @@ typedef struct JSCFunctionListEntry {
 
 /* Note: c++ does not like nested designators */
 #ifdef _MSC_VER
-/* MSVC C11 does not treat function pointers as constant expressions when
-   used with designated initializers for non-first union members of
-   JSCFunctionType. Cast to first member (JSCFunction *) since all
-   function pointers have the same size and representation. */
+/* MSVC does not treat function pointer casts (e.g. (JSCFunction *)func) as
+   constant expressions in static initializers, even with /std:c11 or /std:c17.
+   This causes error C2099 "initializer is not a constant" for any static const
+   array containing JS_CFUNC_*_DEF or JS_CGETSET*_DEF entries. Work around by
+   removing const qualifier on these arrays for MSVC. */
+#define JS_DATA_DEF /* non-const on MSVC to allow function pointer casts in initializers */
 #define JS_CFUNC_DEF(name, length, func1) { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0, .u = { .func = { length, JS_CFUNC_generic, { (JSCFunction *)(func1) } } } }
 #define JS_CFUNC_MAGIC_DEF(name, length, func1, magic) { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, magic, .u = { .func = { length, JS_CFUNC_generic_magic, { (JSCFunction *)(func1) } } } }
 #define JS_CFUNC_SPECIAL_DEF(name, length, cproto, func1) { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0, .u = { .func = { length, JS_CFUNC_ ## cproto, { (JSCFunction *)(func1) } } } }
@@ -1152,6 +1154,7 @@ typedef struct JSCFunctionListEntry {
 #define JS_CGETSET_DEF(name, fgetter, fsetter) { name, JS_PROP_CONFIGURABLE, JS_DEF_CGETSET, 0, .u = { .getset = { { (JSCFunction *)(fgetter) }, { (JSCFunction *)(fsetter) } } } }
 #define JS_CGETSET_MAGIC_DEF(name, fgetter, fsetter, magic) { name, JS_PROP_CONFIGURABLE, JS_DEF_CGETSET_MAGIC, magic, .u = { .getset = { { (JSCFunction *)(fgetter) }, { (JSCFunction *)(fsetter) } } } }
 #else
+#define JS_DATA_DEF const
 #define JS_CFUNC_DEF(name, length, func1) { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0, .u = { .func = { length, JS_CFUNC_generic, { .generic = func1 } } } }
 #define JS_CFUNC_MAGIC_DEF(name, length, func1, magic) { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, magic, .u = { .func = { length, JS_CFUNC_generic_magic, { .generic_magic = func1 } } } }
 #define JS_CFUNC_SPECIAL_DEF(name, length, cproto, func1) { name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE, JS_DEF_CFUNC, 0, .u = { .func = { length, JS_CFUNC_ ## cproto, { .cproto = func1 } } } }

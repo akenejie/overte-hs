@@ -13,7 +13,7 @@ if (MSVC)
         src/quickjs/dtoa.c
         src/quickjs/libregexp.c
         src/quickjs/libunicode.c
-        PROPERTIES COMPILE_OPTIONS "/std:c11"
+        PROPERTIES COMPILE_FLAGS "/std:c11"
     )
 endif()
 

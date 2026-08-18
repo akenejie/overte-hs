@@ -40930,7 +40930,7 @@ exception:
     return res;
 }
 
-static const JSCFunctionListEntry js_object_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_object_funcs[] = {
     JS_CFUNC_DEF("create", 2, js_object_create ),
     JS_CFUNC_MAGIC_DEF("getPrototypeOf", 1, js_object_getPrototypeOf, 0 ),
     JS_CFUNC_DEF("setPrototypeOf", 2, js_object_setPrototypeOf ),
@@ -40956,7 +40956,7 @@ static const JSCFunctionListEntry js_object_funcs[] = {
     JS_CFUNC_DEF("hasOwn", 2, js_object_hasOwn ),
 };
 
-static const JSCFunctionListEntry js_object_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_object_proto_funcs[] = {
     JS_CFUNC_DEF("toString", 0, js_object_toString ),
     JS_CFUNC_DEF("toLocaleString", 0, js_object_toLocaleString ),
     JS_CFUNC_DEF("valueOf", 0, js_object_valueOf ),
@@ -41314,7 +41314,7 @@ static JSValue js_function_hasInstance(JSContext *ctx, JSValueConst this_val,
         return JS_NewBool(ctx, ret);
 }
 
-static const JSCFunctionListEntry js_function_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_function_proto_funcs[] = {
     JS_CFUNC_DEF("call", 1, js_function_call ),
     JS_CFUNC_MAGIC_DEF("apply", 2, js_function_apply, 0 ),
     JS_CFUNC_DEF("bind", 1, js_function_bind ),
@@ -41468,7 +41468,7 @@ static JSValue js_error_toString(JSContext *ctx, JSValueConst this_val,
     return JS_ConcatString(ctx, name, msg);
 }
 
-static const JSCFunctionListEntry js_error_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_error_proto_funcs[] = {
     JS_CFUNC_DEF("toString", 0, js_error_toString ),
     JS_PROP_STRING_DEF("name", "Error", JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
     JS_PROP_STRING_DEF("message", "", JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
@@ -41477,7 +41477,7 @@ static const JSCFunctionListEntry js_error_proto_funcs[] = {
 /* 2 entries for each native error class */
 /* Note: we use an atom to avoid the autoinit definition which does
    not work in get_prop_string() */
-static const JSCFunctionListEntry js_native_error_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_native_error_proto_funcs[] = {
 #define DEF(name) \
     JS_PROP_ATOM_DEF("name", name, JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),\
     JS_PROP_STRING_DEF("message", "", JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
@@ -41499,7 +41499,7 @@ static JSValue js_error_isError(JSContext *ctx, JSValueConst this_val,
     return JS_NewBool(ctx, JS_IsError(ctx, argv[0]));
 }
 
-static const JSCFunctionListEntry js_error_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_error_funcs[] = {
     JS_CFUNC_DEF("isError", 1, js_error_isError),
 };
 
@@ -41830,7 +41830,7 @@ static JSValue JS_ArraySpeciesCreate(JSContext *ctx, JSValueConst obj,
     }
 }
 
-static const JSCFunctionListEntry js_array_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_array_funcs[] = {
     JS_CFUNC_DEF("isArray", 1, js_array_isArray ),
     JS_CFUNC_DEF("from", 1, js_array_from ),
     JS_CFUNC_DEF("of", 0, js_array_of ),
@@ -43557,7 +43557,7 @@ static JSValue js_iterator_wrap_next(JSContext *ctx, JSValueConst this_val,
     }
 }
 
-static const JSCFunctionListEntry js_iterator_wrap_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_iterator_wrap_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_iterator_wrap_next, GEN_MAGIC_NEXT ),
     JS_ITERATOR_NEXT_DEF("return", 0, js_iterator_wrap_next, GEN_MAGIC_RETURN ),
 };
@@ -43741,7 +43741,7 @@ static JSValue js_iterator_concat_return(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static const JSCFunctionListEntry js_iterator_concat_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_iterator_concat_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_iterator_concat_next, 0 ),
     JS_CFUNC_DEF("return", 0, js_iterator_concat_return ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Iterator Concat", JS_PROP_CONFIGURABLE ),
@@ -44533,12 +44533,12 @@ static JSValue js_iterator_helper_next(JSContext *ctx, JSValueConst this_val,
     goto done;
 }
 
-static const JSCFunctionListEntry js_iterator_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_iterator_funcs[] = {
     JS_CFUNC_DEF("concat", 0, js_iterator_concat ),
     JS_CFUNC_DEF("from", 1, js_iterator_from ),
 };
 
-static const JSCFunctionListEntry js_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_iterator_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("drop", 1, js_create_iterator_helper, JS_ITERATOR_HELPER_KIND_DROP ),
     JS_CFUNC_MAGIC_DEF("filter", 1, js_create_iterator_helper, JS_ITERATOR_HELPER_KIND_FILTER ),
     JS_CFUNC_MAGIC_DEF("flatMap", 1, js_create_iterator_helper, JS_ITERATOR_HELPER_KIND_FLAT_MAP ),
@@ -44554,13 +44554,13 @@ static const JSCFunctionListEntry js_iterator_proto_funcs[] = {
     JS_CGETSET_DEF("[Symbol.toStringTag]", js_iterator_proto_get_toStringTag, js_iterator_proto_set_toStringTag),
 };
 
-static const JSCFunctionListEntry js_iterator_helper_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_iterator_helper_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_iterator_helper_next, GEN_MAGIC_NEXT ),
     JS_ITERATOR_NEXT_DEF("return", 0, js_iterator_helper_next, GEN_MAGIC_RETURN ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Iterator Helper", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_array_unscopables_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_array_unscopables_funcs[] = {
     JS_PROP_BOOL_DEF("at", TRUE, JS_PROP_C_W_E),
     JS_PROP_BOOL_DEF("copyWithin", TRUE, JS_PROP_C_W_E),
     JS_PROP_BOOL_DEF("entries", TRUE, JS_PROP_C_W_E),
@@ -44579,7 +44579,7 @@ static const JSCFunctionListEntry js_array_unscopables_funcs[] = {
     JS_PROP_BOOL_DEF("values", TRUE, JS_PROP_C_W_E),
 };
 
-static const JSCFunctionListEntry js_array_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_array_proto_funcs[] = {
     JS_CFUNC_DEF("at", 1, js_array_at ),
     JS_CFUNC_DEF("with", 2, js_array_with ),
     JS_CFUNC_DEF("concat", 1, js_array_concat ),
@@ -44622,7 +44622,7 @@ static const JSCFunctionListEntry js_array_proto_funcs[] = {
     JS_OBJECT_DEF("[Symbol.unscopables]", js_array_unscopables_funcs, countof(js_array_unscopables_funcs), JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_array_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_array_iterator_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_array_iterator_next, 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Array Iterator", JS_PROP_CONFIGURABLE ),
 };
@@ -44723,7 +44723,7 @@ static JSValue js_number_isSafeInteger(JSContext *ctx, JSValueConst this_val,
     return JS_NewBool(ctx, is_safe_integer(d));
 }
 
-static const JSCFunctionListEntry js_number_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_number_funcs[] = {
     /* global ParseInt and parseFloat should be defined already or delayed */
     JS_ALIAS_BASE_DEF("parseInt", "parseInt", 0 ),
     JS_ALIAS_BASE_DEF("parseFloat", "parseFloat", 0 ),
@@ -44887,7 +44887,7 @@ static JSValue js_number_toPrecision(JSContext *ctx, JSValueConst this_val,
     return js_dtoa2(ctx, d, 10, p, JS_DTOA_FORMAT_FIXED);
 }
 
-static const JSCFunctionListEntry js_number_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_number_proto_funcs[] = {
     JS_CFUNC_DEF("toExponential", 1, js_number_toExponential ),
     JS_CFUNC_DEF("toFixed", 1, js_number_toFixed ),
     JS_CFUNC_DEF("toPrecision", 1, js_number_toPrecision ),
@@ -44985,7 +44985,7 @@ static JSValue js_boolean_valueOf(JSContext *ctx, JSValueConst this_val,
     return js_thisBooleanValue(ctx, this_val);
 }
 
-static const JSCFunctionListEntry js_boolean_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_boolean_proto_funcs[] = {
     JS_CFUNC_DEF("toString", 0, js_boolean_toString ),
     JS_CFUNC_DEF("valueOf", 0, js_boolean_valueOf ),
 };
@@ -46658,13 +46658,13 @@ static JSValue js_string_CreateHTML(JSContext *ctx, JSValueConst this_val,
     return string_buffer_end(b);
 }
 
-static const JSCFunctionListEntry js_string_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_string_funcs[] = {
     JS_CFUNC_DEF("fromCharCode", 1, js_string_fromCharCode ),
     JS_CFUNC_DEF("fromCodePoint", 1, js_string_fromCodePoint ),
     JS_CFUNC_DEF("raw", 1, js_string_raw ),
 };
 
-static const JSCFunctionListEntry js_string_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_string_proto_funcs[] = {
     JS_PROP_INT32_DEF("length", 0, JS_PROP_CONFIGURABLE ),
     JS_CFUNC_MAGIC_DEF("at", 1, js_string_charAt, 1 ),
     JS_CFUNC_DEF("charCodeAt", 1, js_string_charCodeAt ),
@@ -46718,12 +46718,12 @@ static const JSCFunctionListEntry js_string_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("sup", 0, js_string_CreateHTML, magic_string_sup ),
 };
 
-static const JSCFunctionListEntry js_string_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_string_iterator_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_string_iterator_next, 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "String Iterator", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_string_proto_normalize[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_string_proto_normalize[] = {
 #ifdef CONFIG_ALL_UNICODE
     JS_CFUNC_DEF("normalize", 0, js_string_normalize ),
 #endif
@@ -47209,7 +47209,7 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
     return __JS_NewFloat64(ctx, u.d - 1.0);
 }
 
-static const JSCFunctionListEntry js_math_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_math_funcs[] = {
     JS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0 ),
     JS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1 ),
     JS_CFUNC_SPECIAL_DEF("abs", 1, f_f, fabs ),
@@ -47260,7 +47260,7 @@ static const JSCFunctionListEntry js_math_funcs[] = {
     JS_PROP_DOUBLE_DEF("SQRT2", 1.4142135623730951, 0 ),
 };
 
-static const JSCFunctionListEntry js_math_obj[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_math_obj[] = {
     JS_OBJECT_DEF("Math", js_math_funcs, countof(js_math_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
 };
 
@@ -49043,12 +49043,12 @@ done:
     return A;
 }
 
-static const JSCFunctionListEntry js_regexp_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_regexp_funcs[] = {
     JS_CFUNC_DEF("escape", 1, js_regexp_escape ),
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL ),
 };
 
-static const JSCFunctionListEntry js_regexp_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_regexp_proto_funcs[] = {
     JS_CGETSET_DEF("flags", js_regexp_get_flags, NULL ),
     JS_CGETSET_DEF("source", js_regexp_get_source, NULL ),
     JS_CGETSET_MAGIC_DEF("global", js_regexp_get_flag, NULL, LRE_FLAG_GLOBAL ),
@@ -49070,7 +49070,7 @@ static const JSCFunctionListEntry js_regexp_proto_funcs[] = {
     JS_CFUNC_DEF("[Symbol.split]", 2, js_regexp_Symbol_split ),
 };
 
-static const JSCFunctionListEntry js_regexp_string_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_regexp_string_iterator_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_regexp_string_iterator_next, 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "RegExp String Iterator", JS_PROP_CONFIGURABLE ),
 };
@@ -50206,7 +50206,7 @@ static JSValue js_json_stringify(JSContext *ctx, JSValueConst this_val,
     return JS_JSONStringify(ctx, argv[0], argv[1], argv[2]);
 }
 
-static const JSCFunctionListEntry js_json_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_json_funcs[] = {
     JS_CFUNC_DEF("isRawJSON", 1, js_json_isRawJSON ),
     JS_CFUNC_DEF("parse", 2, js_json_parse ),
     JS_CFUNC_DEF("rawJSON", 1, js_json_rawJSON ),
@@ -50214,7 +50214,7 @@ static const JSCFunctionListEntry js_json_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "JSON", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_json_obj[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_json_obj[] = {
     JS_OBJECT_DEF("JSON", js_json_funcs, countof(js_json_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
 };
 
@@ -50371,7 +50371,7 @@ static JSValue js_reflect_ownKeys(JSContext *ctx, JSValueConst this_val,
                                    JS_ITERATOR_KIND_KEY);
 }
 
-static const JSCFunctionListEntry js_reflect_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_reflect_funcs[] = {
     JS_CFUNC_DEF("apply", 3, js_reflect_apply ),
     JS_CFUNC_DEF("construct", 2, js_reflect_construct ),
     JS_CFUNC_MAGIC_DEF("defineProperty", 3, js_object_defineProperty, 1 ),
@@ -50388,7 +50388,7 @@ static const JSCFunctionListEntry js_reflect_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Reflect", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_reflect_obj[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_reflect_obj[] = {
     JS_OBJECT_DEF("Reflect", js_reflect_funcs, countof(js_reflect_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
 };
 
@@ -51340,7 +51340,7 @@ static JSValue js_proxy_revocable(JSContext *ctx, JSValueConst this_val,
     return JS_EXCEPTION;
 }
 
-static const JSCFunctionListEntry js_proxy_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_proxy_funcs[] = {
     JS_CFUNC_DEF("revocable", 2, js_proxy_revocable ),
 };
 
@@ -51453,7 +51453,7 @@ static JSValue js_symbol_get_description(JSContext *ctx, JSValueConst this_val)
     return ret;
 }
 
-static const JSCFunctionListEntry js_symbol_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_symbol_proto_funcs[] = {
     JS_CFUNC_DEF("toString", 0, js_symbol_toString ),
     JS_CFUNC_DEF("valueOf", 0, js_symbol_valueOf ),
     // XXX: should have writable: false
@@ -51486,7 +51486,7 @@ static JSValue js_symbol_keyFor(JSContext *ctx, JSValueConst this_val,
     return JS_DupValue(ctx, JS_MKPTR(JS_TAG_STRING, p));
 }
 
-static const JSCFunctionListEntry js_symbol_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_symbol_funcs[] = {
     JS_CFUNC_DEF("for", 1, js_symbol_for ),
     JS_CFUNC_DEF("keyFor", 1, js_symbol_keyFor ),
     JS_PROP_ATOM_DEF("toPrimitive", JS_ATOM_Symbol_toPrimitive, 0),
@@ -53009,12 +53009,12 @@ fini:
     return newset;
 }
 
-static const JSCFunctionListEntry js_map_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_map_funcs[] = {
     JS_CFUNC_MAGIC_DEF("groupBy", 2, js_object_groupBy, 1 ),
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL ),
 };
 
-static const JSCFunctionListEntry js_map_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_map_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("set", 2, js_map_set, 0 ),
     JS_CFUNC_MAGIC_DEF("get", 1, js_map_get, 0 ),
     JS_CFUNC_MAGIC_DEF("getOrInsert", 2, js_map_getOrInsert,
@@ -53033,12 +53033,12 @@ static const JSCFunctionListEntry js_map_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Map", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_map_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_map_iterator_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_map_iterator_next, 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Map Iterator", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_set_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_set_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("add", 1, js_map_set, MAGIC_SET ),
     JS_CFUNC_MAGIC_DEF("has", 1, js_map_has, MAGIC_SET ),
     JS_CFUNC_MAGIC_DEF("delete", 1, js_map_delete, MAGIC_SET ),
@@ -53059,12 +53059,12 @@ static const JSCFunctionListEntry js_set_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Set", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_set_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_set_iterator_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 0, js_map_iterator_next, MAGIC_SET ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Set Iterator", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_weak_map_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_weak_map_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("set", 2, js_map_set, MAGIC_WEAK ),
     JS_CFUNC_MAGIC_DEF("get", 1, js_map_get, MAGIC_WEAK ),
     JS_CFUNC_MAGIC_DEF("getOrInsert", 2, js_map_getOrInsert,
@@ -53076,14 +53076,14 @@ static const JSCFunctionListEntry js_weak_map_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "WeakMap", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_weak_set_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_weak_set_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("add", 1, js_map_set, MAGIC_SET | MAGIC_WEAK ),
     JS_CFUNC_MAGIC_DEF("has", 1, js_map_has, MAGIC_SET | MAGIC_WEAK ),
     JS_CFUNC_MAGIC_DEF("delete", 1, js_map_delete, MAGIC_SET | MAGIC_WEAK ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "WeakSet", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry * const js_map_proto_funcs_ptr[6] = {
+static JS_DATA_DEF JSCFunctionListEntry * const js_map_proto_funcs_ptr[6] = {
     js_map_proto_funcs,
     js_set_proto_funcs,
     js_weak_map_proto_funcs,
@@ -53135,11 +53135,11 @@ int JS_AddIntrinsicMapSet(JSContext *ctx)
 }
 
 /* Generator */
-static const JSCFunctionListEntry js_generator_function_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_generator_function_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "GeneratorFunction", JS_PROP_CONFIGURABLE),
 };
 
-static const JSCFunctionListEntry js_generator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_generator_proto_funcs[] = {
     JS_ITERATOR_NEXT_DEF("next", 1, js_generator_next, GEN_MAGIC_NEXT ),
     JS_ITERATOR_NEXT_DEF("return", 1, js_generator_next, GEN_MAGIC_RETURN ),
     JS_ITERATOR_NEXT_DEF("throw", 1, js_generator_next, GEN_MAGIC_THROW ),
@@ -54178,7 +54178,7 @@ static JSValue js_promise_finally(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static const JSCFunctionListEntry js_promise_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_promise_funcs[] = {
     JS_CFUNC_MAGIC_DEF("resolve", 1, js_promise_resolve, 0 ),
     JS_CFUNC_MAGIC_DEF("reject", 1, js_promise_resolve, 1 ),
     JS_CFUNC_MAGIC_DEF("all", 1, js_promise_all, PROMISE_MAGIC_all ),
@@ -54190,7 +54190,7 @@ static const JSCFunctionListEntry js_promise_funcs[] = {
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL),
 };
 
-static const JSCFunctionListEntry js_promise_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_promise_proto_funcs[] = {
     JS_CFUNC_DEF("then", 2, js_promise_then ),
     JS_CFUNC_DEF("catch", 1, js_promise_catch ),
     JS_CFUNC_DEF("finally", 1, js_promise_finally ),
@@ -54198,13 +54198,13 @@ static const JSCFunctionListEntry js_promise_proto_funcs[] = {
 };
 
 /* AsyncFunction */
-static const JSCFunctionListEntry js_async_function_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_async_function_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "AsyncFunction", JS_PROP_CONFIGURABLE ),
 };
 
 /* AsyncIteratorPrototype */
 
-static const JSCFunctionListEntry js_async_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_async_iterator_proto_funcs[] = {
     JS_CFUNC_DEF("[Symbol.asyncIterator]", 0, js_iterator_proto_iterator ),
 };
 
@@ -54417,7 +54417,7 @@ static JSValue js_async_from_sync_iterator_next(JSContext *ctx, JSValueConst thi
     return JS_EXCEPTION;
 }
 
-static const JSCFunctionListEntry js_async_from_sync_iterator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_async_from_sync_iterator_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("next", 1, js_async_from_sync_iterator_next, GEN_MAGIC_NEXT ),
     JS_CFUNC_MAGIC_DEF("return", 1, js_async_from_sync_iterator_next, GEN_MAGIC_RETURN ),
     JS_CFUNC_MAGIC_DEF("throw", 1, js_async_from_sync_iterator_next, GEN_MAGIC_THROW ),
@@ -54425,13 +54425,13 @@ static const JSCFunctionListEntry js_async_from_sync_iterator_proto_funcs[] = {
 
 /* AsyncGeneratorFunction */
 
-static const JSCFunctionListEntry js_async_generator_function_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_async_generator_function_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "AsyncGeneratorFunction", JS_PROP_CONFIGURABLE ),
 };
 
 /* AsyncGenerator prototype */
 
-static const JSCFunctionListEntry js_async_generator_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_async_generator_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("next", 1, js_async_generator_next, GEN_MAGIC_NEXT ),
     JS_CFUNC_MAGIC_DEF("return", 1, js_async_generator_next, GEN_MAGIC_RETURN ),
     JS_CFUNC_MAGIC_DEF("throw", 1, js_async_generator_next, GEN_MAGIC_THROW ),
@@ -54808,7 +54808,7 @@ static JSValue js_global_unescape(JSContext *ctx, JSValueConst this_val,
 
 /* global object */
 
-static const JSCFunctionListEntry js_global_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_global_funcs[] = {
     JS_CFUNC_DEF("parseInt", 2, js_parseInt ),
     JS_CFUNC_DEF("parseFloat", 1, js_parseFloat ),
     JS_CFUNC_DEF("isNaN", 1, js_global_isNaN ),
@@ -55904,13 +55904,13 @@ done:
     return rv;
 }
 
-static const JSCFunctionListEntry js_date_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_date_funcs[] = {
     JS_CFUNC_DEF("now", 0, js_Date_now ),
     JS_CFUNC_DEF("parse", 1, js_Date_parse ),
     JS_CFUNC_DEF("UTC", 7, js_Date_UTC ),
 };
 
-static const JSCFunctionListEntry js_date_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_date_proto_funcs[] = {
     JS_CFUNC_DEF("valueOf", 0, js_date_getTime ),
     JS_CFUNC_MAGIC_DEF("toString", 0, get_date_string, 0x13 ),
     JS_CFUNC_DEF("[Symbol.toPrimitive]", 1, js_date_Symbol_toPrimitive ),
@@ -56164,12 +56164,12 @@ static JSValue js_bigint_asUintN(JSContext *ctx,
     return res;
 }
 
-static const JSCFunctionListEntry js_bigint_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_bigint_funcs[] = {
     JS_CFUNC_MAGIC_DEF("asUintN", 2, js_bigint_asUintN, 0 ),
     JS_CFUNC_MAGIC_DEF("asIntN", 2, js_bigint_asUintN, 1 ),
 };
 
-static const JSCFunctionListEntry js_bigint_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_bigint_proto_funcs[] = {
     JS_CFUNC_DEF("toString", 0, js_bigint_toString ),
     JS_CFUNC_DEF("valueOf", 0, js_bigint_valueOf ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "BigInt", JS_PROP_CONFIGURABLE ),
@@ -56775,7 +56775,7 @@ static JSValue js_array_buffer_isView(JSContext *ctx,
     return JS_NewBool(ctx, res);
 }
 
-static const JSCFunctionListEntry js_array_buffer_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_array_buffer_funcs[] = {
     JS_CFUNC_DEF("isView", 1, js_array_buffer_isView ),
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL ),
 };
@@ -57146,7 +57146,7 @@ static JSValue js_array_buffer_slice(JSContext *ctx,
     return JS_EXCEPTION;
 }
 
-static const JSCFunctionListEntry js_array_buffer_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_array_buffer_proto_funcs[] = {
     JS_CGETSET_MAGIC_DEF("byteLength", js_array_buffer_get_byteLength, NULL, JS_CLASS_ARRAY_BUFFER ),
     JS_CGETSET_MAGIC_DEF("maxByteLength", js_array_buffer_get_maxByteLength, NULL, JS_CLASS_ARRAY_BUFFER ),
     JS_CGETSET_MAGIC_DEF("resizable", js_array_buffer_get_resizable, NULL, JS_CLASS_ARRAY_BUFFER ),
@@ -57160,11 +57160,11 @@ static const JSCFunctionListEntry js_array_buffer_proto_funcs[] = {
 
 /* SharedArrayBuffer */
 
-static const JSCFunctionListEntry js_shared_array_buffer_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_shared_array_buffer_funcs[] = {
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL ),
 };
 
-static const JSCFunctionListEntry js_shared_array_buffer_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_shared_array_buffer_proto_funcs[] = {
     JS_CGETSET_MAGIC_DEF("byteLength", js_array_buffer_get_byteLength, NULL, JS_CLASS_SHARED_ARRAY_BUFFER ),
     JS_CGETSET_MAGIC_DEF("maxByteLength", js_array_buffer_get_maxByteLength, NULL, JS_CLASS_SHARED_ARRAY_BUFFER ),
     JS_CGETSET_MAGIC_DEF("growable", js_array_buffer_get_resizable, NULL, JS_CLASS_SHARED_ARRAY_BUFFER ),
@@ -59573,13 +59573,13 @@ static JSValue js_uint8array_set_from_hex(JSContext *ctx,
     return js_make_read_written(ctx, read_pos, decoded_len);
 }
 
-static const JSCFunctionListEntry js_typed_array_base_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_typed_array_base_funcs[] = {
     JS_CFUNC_DEF("from", 1, js_typed_array_from ),
     JS_CFUNC_DEF("of", 0, js_typed_array_of ),
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL ),
 };
 
-static const JSCFunctionListEntry js_typed_array_base_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_typed_array_base_proto_funcs[] = {
     JS_CGETSET_DEF("length", js_typed_array_get_length, NULL ),
     JS_CFUNC_DEF("at", 1, js_typed_array_at ),
     JS_CFUNC_DEF("with", 2, js_typed_array_with ),
@@ -59619,14 +59619,14 @@ static const JSCFunctionListEntry js_typed_array_base_proto_funcs[] = {
     //JS_ALIAS_BASE_DEF("toString", "toString", 2 /* Array.prototype. */), @@@
 };
 
-static const JSCFunctionListEntry js_typed_array_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_typed_array_funcs[] = {
     JS_PROP_INT32_DEF("BYTES_PER_ELEMENT", 1, 0),
     JS_PROP_INT32_DEF("BYTES_PER_ELEMENT", 2, 0),
     JS_PROP_INT32_DEF("BYTES_PER_ELEMENT", 4, 0),
     JS_PROP_INT32_DEF("BYTES_PER_ELEMENT", 8, 0),
 };
 
-static const JSCFunctionListEntry js_uint8array_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_uint8array_proto_funcs[] = {
     JS_PROP_INT32_DEF("BYTES_PER_ELEMENT", 1, 0),
     JS_CFUNC_DEF("toBase64", 0, js_uint8array_to_base64),
     JS_CFUNC_DEF("toHex", 0, js_uint8array_to_hex),
@@ -59634,7 +59634,7 @@ static const JSCFunctionListEntry js_uint8array_proto_funcs[] = {
     JS_CFUNC_DEF("setFromHex", 1, js_uint8array_set_from_hex),
 };
 
-static const JSCFunctionListEntry js_uint8array_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_uint8array_funcs[] = {
     JS_PROP_INT32_DEF("BYTES_PER_ELEMENT", 1, 0),
     JS_CFUNC_DEF("fromBase64", 1, js_uint8array_from_base64),
     JS_CFUNC_DEF("fromHex", 1, js_uint8array_from_hex),
@@ -60297,7 +60297,7 @@ static JSValue js_dataview_setValue(JSContext *ctx,
     return JS_UNDEFINED;
 }
 
-static const JSCFunctionListEntry js_dataview_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_dataview_proto_funcs[] = {
     JS_CGETSET_DEF("buffer", js_dataview_get_buffer, NULL ),
     JS_CGETSET_DEF("byteLength", js_dataview_get_byteLength, NULL ),
     JS_CGETSET_DEF("byteOffset", js_dataview_get_byteOffset, NULL ),
@@ -60816,7 +60816,7 @@ static JSValue js_atomics_notify(JSContext *ctx,
     return JS_NewInt32(ctx, n);
 }
 
-static const JSCFunctionListEntry js_atomics_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_atomics_funcs[] = {
     JS_CFUNC_MAGIC_DEF("add", 3, js_atomics_op, ATOMICS_OP_ADD ),
     JS_CFUNC_MAGIC_DEF("and", 3, js_atomics_op, ATOMICS_OP_AND ),
     JS_CFUNC_MAGIC_DEF("or", 3, js_atomics_op, ATOMICS_OP_OR ),
@@ -60833,7 +60833,7 @@ static const JSCFunctionListEntry js_atomics_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Atomics", JS_PROP_CONFIGURABLE ),
 };
 
-static const JSCFunctionListEntry js_atomics_obj[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_atomics_obj[] = {
     JS_OBJECT_DEF("Atomics", js_atomics_funcs, countof(js_atomics_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
 };
 
@@ -61011,7 +61011,7 @@ static JSValue js_weakref_deref(JSContext *ctx, JSValueConst this_val, int argc,
         return JS_UNDEFINED;
 }
 
-static const JSCFunctionListEntry js_weakref_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_weakref_proto_funcs[] = {
     JS_CFUNC_DEF("deref", 0, js_weakref_deref ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "WeakRef", JS_PROP_CONFIGURABLE ),
 };
@@ -61190,7 +61190,7 @@ static JSValue js_finrec_unregister(JSContext *ctx, JSValueConst this_val, int a
     return JS_NewBool(ctx, removed);
 }
 
-static const JSCFunctionListEntry js_finrec_proto_funcs[] = {
+static JS_DATA_DEF JSCFunctionListEntry js_finrec_proto_funcs[] = {
     JS_CFUNC_DEF("register", 2, js_finrec_register ),
     JS_CFUNC_DEF("unregister", 1, js_finrec_unregister ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "FinalizationRegistry", JS_PROP_CONFIGURABLE ),
