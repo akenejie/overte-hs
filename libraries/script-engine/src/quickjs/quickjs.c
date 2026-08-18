@@ -243,8 +243,10 @@ typedef enum JSErrorEnum {
 
 #if defined(__GNUC__) || defined(__clang__)
 #define __exception __attribute__((warn_unused_result))
+#define __unused __attribute__((unused))
 #else
 #define __exception
+#define __unused
 #endif
 
 typedef struct JSShape JSShape;
@@ -12870,7 +12872,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
         if (!(flags & ATOD_INT_ONLY) &&
             (atod_type == ATOD_TYPE_FLOAT64) &&
             strstart(p, "Infinity", &p)) {
-            double d = 1.0 / 0.0;
+            double d = INFINITY;
             if (is_neg)
                 d = -d;
             val = JS_NewFloat64(ctx, d);
@@ -22139,7 +22141,7 @@ static void free_token(JSParseState *s, JSToken *token)
     }
 }
 
-static void __attribute((unused)) dump_token(JSParseState *s,
+static void __unused dump_token(JSParseState *s,
                                              const JSToken *token)
 {
     switch(token->val) {
@@ -23328,7 +23330,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
     if (!is_digit(*p)) {
         if (s->ext_json) {
             if (strstart((const char *)p, "Infinity", (const char **)&p)) {
-                d = 1.0 / 0.0;
+                d = INFINITY;
                 if (*p_start == '-')
                     d = -d;
                 goto done;
@@ -46773,7 +46775,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
     uint32_t tag;
 
     if (unlikely(argc == 0)) {
-        return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
+        return __JS_NewFloat64(ctx, is_max ? -INFINITY : INFINITY);
     }
 
     tag = JS_VALUE_GET_TAG(argv[0]);

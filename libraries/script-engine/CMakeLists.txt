@@ -4,6 +4,19 @@
 
 set(TARGET_NAME script-engine)
 
+# quickjs.c uses C99 designated initializers (e.g., .u = { .func = { ... } })
+# MSVC defaults to C89; enable C11 for this target's C sources.
+if (MSVC)
+    set_source_files_properties(
+        src/quickjs/quickjs.c
+        src/quickjs/cutils.c
+        src/quickjs/dtoa.c
+        src/quickjs/libregexp.c
+        src/quickjs/libunicode.c
+        PROPERTIES COMPILE_OPTIONS "/std:c11"
+    )
+endif()
+
 
 # FIXME Move undo scripting interface to application and remove Widgets
 setup_hifi_library(Network)
