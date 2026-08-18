@@ -293,7 +293,7 @@ jobs:
         run: |
           if (! (cmake --build build --target overte-server --config Release --parallel 4 > build.log 2>&1) ) {
             Write-Host "==> BUILD FAILED - error context:"
-            Select-String -Path build.log -Pattern "error\s+C\d|error\s+L\d|fatal error|LINK\s+:|error:" | Select-Object -First 40 | ForEach-Object { $_.Line }
+            Select-String -Path build.log -Pattern "error\s+C\d|error\s+LNK\d+|error MSB\d+|fatal error|LINK\s+:|error:" | Select-Object -First 40 | ForEach-Object { $_.Line }
             Write-Host "==> last 40 log lines:"
             Get-Content build.log -Tail 40
             exit 1
