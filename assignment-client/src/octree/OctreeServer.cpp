@@ -15,6 +15,7 @@
 #include <QJsonObject>
 #include <QTimer>
 
+#include <cstdio>
 #include <time.h>
 
 #include <AccountManager.h>
@@ -650,13 +651,17 @@ void OctreeServer::domainSettingsRequestComplete() {
 }
 
 void OctreeServer::beginRunning() {
+    fprintf(stderr, "[CRASH-DBG] beginRunning: start\n"); fflush(stderr);
     auto nodeList = DependencyManager::get<NodeList>();
+    fprintf(stderr, "[CRASH-DBG] beginRunning: got nodeList\n"); fflush(stderr);
 
     // we need to ask the DS about agents so we can ping/reply with them
     nodeList->addSetOfNodeTypesToNodeInterestSet({ NodeType::Agent, NodeType::EntityScriptServer,
         NodeType::AvatarMixer, NodeType::AudioMixer });
+    fprintf(stderr, "[CRASH-DBG] beginRunning: added interest set\n"); fflush(stderr);
 
     beforeRun(); // after payload has been processed
+    fprintf(stderr, "[CRASH-DBG] beginRunning: beforeRun done\n"); fflush(stderr);
 
     connect(nodeList.data(), &NodeList::nodeAdded, this, &OctreeServer::nodeAdded);
     connect(nodeList.data(), &NodeList::nodeKilled, this, &OctreeServer::nodeKilled);
@@ -671,7 +676,9 @@ void OctreeServer::beginRunning() {
 
     // set up our OctreeServerPacketProcessor
     _octreeInboundPacketProcessor = new OctreeInboundPacketProcessor(this);
+    fprintf(stderr, "[CRASH-DBG] beginRunning: OctreeInboundPacketProcessor created\n"); fflush(stderr);
     _octreeInboundPacketProcessor->initialize(true);
+    fprintf(stderr, "[CRASH-DBG] beginRunning: OctreeInboundPacketProcessor initialized\n"); fflush(stderr);
 
     // Convert now to tm struct for local timezone
     tm* localtm = localtime(&_started);
@@ -686,6 +693,7 @@ void OctreeServer::beginRunning() {
     }
 
     qDebug() << "Now running... started at: " << localBuffer << utcBuffer;
+    fprintf(stderr, "[CRASH-DBG] beginRunning: end\n"); fflush(stderr);
 }
 
 void OctreeServer::nodeAdded(SharedNodePointer node) {
