@@ -9,7 +9,6 @@
 
 #include "PlatformInstance.h"
 #include <QNetworkInterface>
-#include <cstdio>
 
 #ifndef OVERTE_HEADLESS
 #include <gl/GLHelpers.h>
@@ -28,7 +27,6 @@
 using namespace platform;
 
 bool Instance::enumeratePlatform() {
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: entered\n"); fflush(stderr);
     //clear all knowledge
     _computer.clear();
     _memory.clear();
@@ -37,31 +35,20 @@ bool Instance::enumeratePlatform() {
     _displays.clear();
     _nics.clear();
 
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: clearing done\n"); fflush(stderr);
-
     // enumerate platform components
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: enumerateComputer\n"); fflush(stderr);
     enumerateComputer();
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: enumerateMemory\n"); fflush(stderr);
     enumerateMemory();
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: enumerateCpus\n"); fflush(stderr);
     enumerateCpus();
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: enumerateGpusAndDisplays\n"); fflush(stderr);
     enumerateGpusAndDisplays();
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: enumerateNics\n"); fflush(stderr);
     enumerateNics();
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: enumerateGraphicsApis\n"); fflush(stderr);
     enumerateGraphicsApis();
     
     // eval the primary index for each platform scopes
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: updatePrimaryIndices\n"); fflush(stderr);
     updatePrimaryIndices();
 
     // And profile the platform and put the tier in "computer"
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: profilePlatform\n"); fflush(stderr);
     _computer[keys::computer::profileTier] = Profiler::TierNames[Profiler::profilePlatform()];
 
-    fprintf(stderr, "[CRASH-DBG] enumeratePlatform: exiting OK\n"); fflush(stderr);
     return true;
 }
 

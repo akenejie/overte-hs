@@ -228,7 +228,6 @@ void AssignmentClient::sendAssignmentRequest() {
 }
 
 void AssignmentClient::handleCreateAssignmentPacket(QSharedPointer<ReceivedMessage> message) {
-    fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: entered\n"); fflush(stderr);
     qCDebug(assignment_client) << "Received a PacketType::CreateAssignment - attempting to unpack.";
 
     if (_currentAssignment) {
@@ -237,10 +236,7 @@ void AssignmentClient::handleCreateAssignmentPacket(QSharedPointer<ReceivedMessa
     }
 
     // construct the deployed assignment from the packet data
-    fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: calling unpackAssignment\n"); fflush(stderr);
     _currentAssignment = AssignmentFactory::unpackAssignment(*message);
-    fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: unpackAssignment returned, null=%d\n",
-            _currentAssignment.isNull() ? 1 : 0); fflush(stderr);
 
     if (_currentAssignment && !_isAssigned) {
         qDebug(assignment_client) << "Received an assignment -" << *_currentAssignment;
@@ -279,17 +275,13 @@ void AssignmentClient::handleCreateAssignmentPacket(QSharedPointer<ReceivedMessa
         // once the worker thread says it is done, we consider the assignment completed
         connect(workerThread, &QThread::destroyed, this, &AssignmentClient::assignmentCompleted);
 
-        fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: moving to thread\n"); fflush(stderr);
         _currentAssignment->moveToThread(workerThread);
-        fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: starting thread\n"); fflush(stderr);
 
         // Starts an event loop, and emits workerThread->started()
         workerThread->start();
-        fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: thread started\n"); fflush(stderr);
     } else {
         qCWarning(assignment_client) << "ALERT: Received an assignment that could not be unpacked. Re-requesting.";
     }
-    fprintf(stderr, "[CRASH-DBG] handleCreateAssignmentPacket: exiting\n"); fflush(stderr);
 }
 
 void AssignmentClient::handleStopNodePacket(QSharedPointer<ReceivedMessage> message) {

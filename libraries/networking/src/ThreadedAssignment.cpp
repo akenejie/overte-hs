@@ -29,8 +29,6 @@ ThreadedAssignment::ThreadedAssignment(ReceivedMessage& message) :
     _domainServerTimer(this),
     _statsTimer(this)
 {
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: entered\n"); fflush(stderr);
-
     // use <mixer-type> as a temporary targetName name until commonInit can be called later
     LogHandler::getInstance().setTargetName(QString("<%1>").arg(getTypeName()));
 
@@ -41,23 +39,14 @@ ThreadedAssignment::ThreadedAssignment(ReceivedMessage& message) :
     connect(&_domainServerTimer, &QTimer::timeout, this, &ThreadedAssignment::checkInWithDomainServerOrExit);
     _domainServerTimer.setInterval(DOMAIN_SERVER_CHECK_IN_MSECS); // 1s, Qt::CoarseTimer acceptable
 
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: timers connected\n"); fflush(stderr);
-
     // if the NL tells us we got a DS response, clear our member variable of queued check-ins
     auto nodeList = DependencyManager::get<NodeList>();
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: got NodeList\n"); fflush(stderr);
     connect(nodeList.data(), &NodeList::receivedDomainServerList, this, &ThreadedAssignment::clearQueuedCheckIns);
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: connected DS signal\n"); fflush(stderr);
 
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: calling platform::create()\n"); fflush(stderr);
     platform::create();
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: platform::create() done\n"); fflush(stderr);
     if (!platform::enumeratePlatform()) {
-        fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: enumeratePlatform FAILED\n"); fflush(stderr);
-    } else {
-        fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: enumeratePlatform OK\n"); fflush(stderr);
+        qCDebug(networking) << "Failed to enumerate platform.";
     }
-    fprintf(stderr, "[CRASH-DBG] ThreadedAssignment ctor: exiting\n"); fflush(stderr);
 }
 
 ThreadedAssignment::~ThreadedAssignment() {
