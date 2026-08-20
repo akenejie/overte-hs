@@ -11,6 +11,7 @@
 
 #include <thread>
 #include <string>
+#include <cstdio>
 
 #include <CPUIdent.h>
 
@@ -44,6 +45,7 @@ void WINInstance::enumerateCpus() {
 
 void WINInstance::enumerateGpusAndDisplays() {
 #ifdef Q_OS_WIN
+    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: entered\n"); fflush(stderr);
     struct ConvertLargeIntegerToString {
         std::string convert(const LARGE_INTEGER& version) {
             std::ostringstream value;
@@ -63,9 +65,13 @@ void WINInstance::enumerateGpusAndDisplays() {
     // Let s get into DXGI land:
     HRESULT hr = S_OK;
 
+    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: CreateDXGIFactory1\n"); fflush(stderr);
     IDXGIFactory1* pFactory = nullptr;
     hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&pFactory));
+    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: CreateDXGIFactory1 hr=0x%lx pFactory=%p\n",
+            (unsigned long)hr, (void*)pFactory); fflush(stderr);
     if (hr != S_OK || pFactory == nullptr) {
+        fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: no DXGI factory, returning\n"); fflush(stderr);
         return;
     }
 
@@ -77,15 +83,21 @@ void WINInstance::enumerateGpusAndDisplays() {
         UINT adapterNum = 0;
         IDXGIAdapter1* pAdapter = nullptr;
         while (pFactory->EnumAdapters1(adapterNum, &pAdapter) != DXGI_ERROR_NOT_FOUND) {
+            fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: adapter %u found\n", adapterNum); fflush(stderr);
             // Found an adapter, get descriptor
             DXGI_ADAPTER_DESC1 adapterDesc;
+            fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: GetDesc1\n"); fflush(stderr);
             pAdapter->GetDesc1(&adapterDesc);
+            fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: GetDesc1 done, Flags=0x%x\n", adapterDesc.Flags); fflush(stderr);
             
             // Only describe gpu if it is a hardware adapter
             if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) {
  
                 LARGE_INTEGER version;
+                fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: CheckInterfaceSupport\n"); fflush(stderr);
                 hr = pAdapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &version);
+                fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: CheckInterfaceSupport hr=0x%lx\n",
+                        (unsigned long)hr); fflush(stderr);
 
                 std::wstring wDescription(adapterDesc.Description);
                 std::string description(wDescription.begin(), wDescription.end());
@@ -102,9 +114,12 @@ void WINInstance::enumerateGpusAndDisplays() {
                 UINT outputNum = 0;
                 IDXGIOutput* pOutput;
                 bool hasOutputConnectedToDesktop = false;
+                fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: enumerating outputs\n"); fflush(stderr);
                 while (pAdapter->EnumOutputs(outputNum, &pOutput) != DXGI_ERROR_NOT_FOUND) {
+                    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: output %u found\n", outputNum); fflush(stderr);
                     // FOund an output attached to the adapter, get descriptor
                     DXGI_OUTPUT_DESC outputDesc;
+                    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: GetDesc(output)\n"); fflush(stderr);
                     pOutput->GetDesc(&outputDesc);
                     pOutput->Release();
                     outputNum++;
@@ -112,7 +127,9 @@ void WINInstance::enumerateGpusAndDisplays() {
                     // Grab the monitor info
                     MONITORINFO monitorInfo;
                     monitorInfo.cbSize = sizeof(MONITORINFO);
+                    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: GetMonitorInfo\n"); fflush(stderr);
                     GetMonitorInfo(outputDesc.Monitor, &monitorInfo);
+                    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: GetMonitorInfo done\n"); fflush(stderr);
 
                     // Grab the dpi info for the monitor
                     UINT dpiX{ 0 };
@@ -134,10 +151,12 @@ void WINInstance::enumerateGpusAndDisplays() {
                     // Current display mode
                     DEVMODEW devMode;
                     devMode.dmSize = sizeof(DEVMODEW);
+                    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: EnumDisplaySettingsW\n"); fflush(stderr);
                     EnumDisplaySettingsW(outputDesc.DeviceName, ENUM_CURRENT_SETTINGS, &devMode);
+                    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: EnumDisplaySettingsW done\n"); fflush(stderr);
 
-                    auto physicalWidth = devMode.dmPelsWidth / (float)dpiX;
-                    auto physicalHeight = devMode.dmPelsHeight / (float)dpiY;
+                    auto physicalWidth = (dpiX != 0) ? devMode.dmPelsWidth / (float)dpiX : 0.0f;
+                    auto physicalHeight = (dpiY != 0) ? devMode.dmPelsHeight / (float)dpiY : 0.0f;
 
                     json display = {};
 
@@ -182,6 +201,7 @@ void WINInstance::enumerateGpusAndDisplays() {
                     // One more display desc
                     _displays.push_back(display);
                 }
+                fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: outputs done, count=%zu\n", displayIndices.size()); fflush(stderr);
                 gpu[keys::gpu::displays] = displayIndices;
 
                 _gpus.push_back(gpu);
@@ -191,7 +211,9 @@ void WINInstance::enumerateGpusAndDisplays() {
             adapterNum++;
         }
     }
+    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: releasing factory\n"); fflush(stderr);
     pFactory->Release();
+    fprintf(stderr, "[CRASH-DBG] enumerateGpusAndDisplays: exiting OK\n"); fflush(stderr);
 #endif
 }
 
