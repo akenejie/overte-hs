@@ -909,14 +909,18 @@ bool Octree::toJSONString(QString& jsonString, const OctreeElementPointer& eleme
     }
 
     jsonString += QString("{\n  \"DataVersion\": %1,\n  \"Entities\": [").arg(_persistDataVersion);
+    octreeDbg("toJSONString: header written, calling writeToJSON...");
 
     writeToJSON(jsonString, top);
+    octreeDbg("toJSONString: writeToJSON done");
 
     // include the "bitstream" version
     PacketType expectedType = expectedDataPacketType();
     PacketVersion expectedVersion = versionForPacketType(expectedType);
+    octreeDbg("toJSONString: writing footer...");
 
     jsonString += QString("\n    ],\n  \"Id\": \"%1\",\n  \"Version\": %2\n}\n").arg(_persistID.toString()).arg((int)expectedVersion);
+    octreeDbg("toJSONString: done");
 
     return true;
 }

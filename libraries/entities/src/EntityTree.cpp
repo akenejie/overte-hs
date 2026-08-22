@@ -44,6 +44,17 @@
 #include "EntityDynamicFactoryInterface.h"
 
 static const quint64 DELETED_ENTITIES_EXTRA_USECS_TO_CONSIDER = USECS_PER_MSEC * 50;
+
+static FILE* entityDbgFile = nullptr;
+static void entityDbg(const char* msg) {
+    if (!entityDbgFile) {
+        entityDbgFile = fopen("crashdbg.log", "a");
+    }
+    if (entityDbgFile) {
+        fprintf(entityDbgFile, "[CRASH-DBG] EntityTree: %s\n", msg);
+        fflush(entityDbgFile);
+    }
+}
 const float EntityTree::DEFAULT_MAX_TMP_ENTITY_LIFETIME = 60 * 60; // 1 hour
 static const QString DOMAIN_UNLIMITED = "domainUnlimited";
 
@@ -2921,12 +2932,18 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
 }
 
 bool EntityTree::writeToJSON(QString& jsonString, const OctreeElementPointer& element) {
+    entityDbg("writeToJSON: start, about to run in helperScriptEngine...");
     _helperScriptEngine.run( [&] {
+        entityDbg("writeToJSON: inside lambda, creating RecurseOctreeToJSONOperator...");
         RecurseOctreeToJSONOperator theOperator(element, _helperScriptEngine.get(), jsonString);
+        entityDbg("writeToJSON: operator created, calling recurseTreeWithOperator...");
         withReadLock([&] { recurseTreeWithOperator(&theOperator); });
+        entityDbg("writeToJSON: recursion done, getting json...");
 
         jsonString = theOperator.getJson();
+        entityDbg("writeToJSON: json copied");
     });
+    entityDbg("writeToJSON: done");
     return true;
 }
 
