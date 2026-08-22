@@ -22,18 +22,11 @@ HelperScriptEngine::HelperScriptEngine() {
         // packet-based entity networking.
         return;
     }
-    _scriptEngineThread.reset(new QThread());
-    _scriptEngine->setThread(_scriptEngineThread.get());
-    _scriptEngineThread->start();
 }
 
 HelperScriptEngine::~HelperScriptEngine() {
     std::lock_guard<std::mutex> lock(_scriptEngineLock);
     if (_scriptEngine) {
-        if (_scriptEngineThread) {
-            _scriptEngineThread->quit();
-            _scriptEngineThread->wait();
-        }
         _scriptEngine.reset();
     }
 }
