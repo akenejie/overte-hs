@@ -650,18 +650,30 @@ void OctreeServer::domainSettingsRequestComplete() {
     }
 }
 
+static FILE* crashDbgFile = nullptr;
+
+static void crashDbg(const char* msg) {
+    if (!crashDbgFile) {
+        crashDbgFile = fopen("crashdbg.log", "a");
+    }
+    if (crashDbgFile) {
+        fprintf(crashDbgFile, "[CRASH-DBG] %s\n", msg);
+        fflush(crashDbgFile);
+    }
+}
+
 void OctreeServer::beginRunning() {
-    fprintf(stderr, "[CRASH-DBG] beginRunning: start\n"); fflush(stderr);
+    crashDbg("beginRunning: start");
     auto nodeList = DependencyManager::get<NodeList>();
-    fprintf(stderr, "[CRASH-DBG] beginRunning: got nodeList\n"); fflush(stderr);
+    crashDbg("beginRunning: got nodeList");
 
     // we need to ask the DS about agents so we can ping/reply with them
     nodeList->addSetOfNodeTypesToNodeInterestSet({ NodeType::Agent, NodeType::EntityScriptServer,
         NodeType::AvatarMixer, NodeType::AudioMixer });
-    fprintf(stderr, "[CRASH-DBG] beginRunning: added interest set\n"); fflush(stderr);
+    crashDbg("beginRunning: added interest set");
 
     beforeRun(); // after payload has been processed
-    fprintf(stderr, "[CRASH-DBG] beginRunning: beforeRun done\n"); fflush(stderr);
+    crashDbg("beginRunning: beforeRun done");
 
     connect(nodeList.data(), &NodeList::nodeAdded, this, &OctreeServer::nodeAdded);
     connect(nodeList.data(), &NodeList::nodeKilled, this, &OctreeServer::nodeKilled);
@@ -676,9 +688,9 @@ void OctreeServer::beginRunning() {
 
     // set up our OctreeServerPacketProcessor
     _octreeInboundPacketProcessor = new OctreeInboundPacketProcessor(this);
-    fprintf(stderr, "[CRASH-DBG] beginRunning: OctreeInboundPacketProcessor created\n"); fflush(stderr);
+    crashDbg("beginRunning: OctreeInboundPacketProcessor created");
     _octreeInboundPacketProcessor->initialize(true);
-    fprintf(stderr, "[CRASH-DBG] beginRunning: OctreeInboundPacketProcessor initialized\n"); fflush(stderr);
+    crashDbg("beginRunning: OctreeInboundPacketProcessor initialized");
 
     // Convert now to tm struct for local timezone
     tm* localtm = localtime(&_started);
@@ -693,7 +705,7 @@ void OctreeServer::beginRunning() {
     }
 
     qDebug() << "Now running... started at: " << localBuffer << utcBuffer;
-    fprintf(stderr, "[CRASH-DBG] beginRunning: end\n"); fflush(stderr);
+    crashDbg("beginRunning: end");
 }
 
 void OctreeServer::nodeAdded(SharedNodePointer node) {

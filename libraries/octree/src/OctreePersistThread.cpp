@@ -152,7 +152,7 @@ void OctreePersistThread::handleOctreeDataFileReply(QSharedPointer<ReceivedMessa
 
     bool persistentFileRead;
 
-    fprintf(stderr, "[CRASH-DBG] handleOctreeDataFileReply: about to load tree from file/stream\n"); fflush(stderr);
+    crashDbg("handleOctreeDataFileReply: about to load tree from file/stream");
     _tree->withWriteLock([&] {
         PerformanceWarning warn(true, "Loading Octree File", true);
 
@@ -195,16 +195,16 @@ void OctreePersistThread::handleOctreeDataFileReply(QSharedPointer<ReceivedMessa
     _lastPersistCheck = std::chrono::steady_clock::now();
 
     if (replacementData.isNull()) {
-        fprintf(stderr, "[CRASH-DBG] handleOctreeDataFileReply: calling sendLatestEntityDataToDS...\n"); fflush(stderr);
+        crashDbg("handleOctreeDataFileReply: calling sendLatestEntityDataToDS...");
         sendLatestEntityDataToDS();
-        fprintf(stderr, "[CRASH-DBG] handleOctreeDataFileReply: sendLatestEntityDataToDS returned\n"); fflush(stderr);
+        crashDbg("handleOctreeDataFileReply: sendLatestEntityDataToDS returned");
     }
 
     QTimer::singleShot(TIME_BETWEEN_PROCESSING.count(), this, &OctreePersistThread::process);
 
-    fprintf(stderr, "[CRASH-DBG] handleOctreeDataFileReply: emitting loadCompleted...\n"); fflush(stderr);
+    crashDbg("handleOctreeDataFileReply: emitting loadCompleted...");
     emit loadCompleted();
-    fprintf(stderr, "[CRASH-DBG] handleOctreeDataFileReply: loadCompleted emitted\n"); fflush(stderr);
+    crashDbg("handleOctreeDataFileReply: loadCompleted emitted");
 }
 
 
@@ -331,28 +331,39 @@ void OctreePersistThread::persist() {
     }
 }
 
+static FILE* crashDbgFile = nullptr;
+
+static void crashDbg(const char* msg) {
+    if (!crashDbgFile) {
+        crashDbgFile = fopen("crashdbg.log", "a");
+    }
+    if (crashDbgFile) {
+        fprintf(crashDbgFile, "[CRASH-DBG] %s\n", msg);
+        fflush(crashDbgFile);
+    }
+}
+
 void OctreePersistThread::sendLatestEntityDataToDS() {
     qDebug() << "Sending latest entity data to DS";
-    fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: start\n"); fflush(stderr);
+    crashDbg("sendLatestEntityDataToDS: start");
     auto nodeList = DependencyManager::get<NodeList>();
-    fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: got nodeList\n"); fflush(stderr);
+    crashDbg("sendLatestEntityDataToDS: got nodeList");
     const DomainHandler& domainHandler = nodeList->getDomainHandler();
-    fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: got domainHandler, sockAddr=%s\n",
-            domainHandler.getSockAddr().toString().toLocal8Bit().constData()); fflush(stderr);
+    crashDbg(qPrintable(QString("sendLatestEntityDataToDS: got domainHandler, sockAddr=%1").arg(domainHandler.getSockAddr().toString())));
 
     QByteArray data;
-    fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: calling toJSON...\n"); fflush(stderr);
+    crashDbg("sendLatestEntityDataToDS: calling toJSON...");
     if (_tree->toJSON(&data, nullptr, true)) {
-        fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: toJSON done, data.size=%d\n", data.size()); fflush(stderr);
+        crashDbg(qPrintable(QString("sendLatestEntityDataToDS: toJSON done, data.size=%1").arg(data.size())));
         auto message = NLPacketList::create(PacketType::OctreeDataPersist, QByteArray(), true, true);
-        fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: NLPacketList created\n"); fflush(stderr);
+        crashDbg("sendLatestEntityDataToDS: NLPacketList created");
         message->write(data);
-        fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: data written to message, calling sendPacketList...\n"); fflush(stderr);
+        crashDbg("sendLatestEntityDataToDS: data written, calling sendPacketList...");
         nodeList->sendPacketList(std::move(message), domainHandler.getSockAddr());
-        fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: sendPacketList done\n"); fflush(stderr);
+        crashDbg("sendLatestEntityDataToDS: sendPacketList done");
     } else {
-        fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: toJSON FAILED\n"); fflush(stderr);
+        crashDbg("sendLatestEntityDataToDS: toJSON FAILED");
         qCWarning(octree) << "Failed to persist octree to DS";
     }
-    fprintf(stderr, "[CRASH-DBG] sendLatestEntityDataToDS: end\n"); fflush(stderr);
+    crashDbg("sendLatestEntityDataToDS: end");
 }
