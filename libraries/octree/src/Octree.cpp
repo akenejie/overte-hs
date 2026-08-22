@@ -18,6 +18,17 @@
 
 #include <QDataStream>
 #include <QDebug>
+
+static FILE* octreeDbgFile = nullptr;
+static void octreeDbg(const char* msg) {
+    if (!octreeDbgFile) {
+        octreeDbgFile = fopen("crashdbg.log", "a");
+    }
+    if (octreeDbgFile) {
+        fprintf(octreeDbgFile, "[CRASH-DBG] %s\n", msg);
+        fflush(octreeDbgFile);
+    }
+}
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
@@ -911,18 +922,27 @@ bool Octree::toJSONString(QString& jsonString, const OctreeElementPointer& eleme
 }
 
 bool Octree::toJSON(QByteArray* data, const OctreeElementPointer& element, bool doGzip) {
+    octreeDbg("toJSON: start");
     QString jsonString;
+    octreeDbg("toJSON: calling toJSONString...");
     toJSONString(jsonString);
+    octreeDbg(qPrintable(QString("toJSON: toJSONString done, size=%1").arg(jsonString.size())));
 
     if (doGzip) {
-        if (!gzip(jsonString.toUtf8(), *data, -1)) {
+        octreeDbg("toJSON: converting to UTF8...");
+        QByteArray utf8Data = jsonString.toUtf8();
+        octreeDbg(qPrintable(QString("toJSON: UTF8 size=%1, calling gzip...").arg(utf8Data.size())));
+        if (!gzip(utf8Data, *data, -1)) {
+            octreeDbg("toJSON: gzip FAILED");
             qCritical("Unable to gzip data while saving to json.");
             return false;
         }
+        octreeDbg(qPrintable(QString("toJSON: gzip done, output size=%1").arg(data->size())));
     } else {
         *data = jsonString.toUtf8();
     }
 
+    octreeDbg("toJSON: end");
     return true;
 }
 
