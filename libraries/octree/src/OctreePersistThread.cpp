@@ -44,6 +44,18 @@ constexpr std::chrono::milliseconds TIME_BETWEEN_PROCESSING { 10 };
 constexpr int MAX_OCTREE_REPLACEMENT_BACKUP_FILES_COUNT { 20 };
 constexpr int64_t MAX_OCTREE_REPLACEMENT_BACKUP_FILES_SIZE_BYTES { 50 * 1000 * 1000 };
 
+static FILE* crashDbgFile = nullptr;
+
+static void crashDbg(const char* msg) {
+    if (!crashDbgFile) {
+        crashDbgFile = fopen("crashdbg.log", "a");
+    }
+    if (crashDbgFile) {
+        fprintf(crashDbgFile, "[CRASH-DBG] %s\n", msg);
+        fflush(crashDbgFile);
+    }
+}
+
 OctreePersistThread::OctreePersistThread(OctreePointer tree, const QString& filename, std::chrono::milliseconds persistInterval,
                                          bool debugTimestampNow, QString persistAsFileType) :
     _tree(tree),
@@ -328,18 +340,6 @@ void OctreePersistThread::persist() {
         }
 
         sendLatestEntityDataToDS();
-    }
-}
-
-static FILE* crashDbgFile = nullptr;
-
-static void crashDbg(const char* msg) {
-    if (!crashDbgFile) {
-        crashDbgFile = fopen("crashdbg.log", "a");
-    }
-    if (crashDbgFile) {
-        fprintf(crashDbgFile, "[CRASH-DBG] %s\n", msg);
-        fflush(crashDbgFile);
     }
 }
 
