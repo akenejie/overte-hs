@@ -15,6 +15,8 @@
 
 HelperScriptEngine::HelperScriptEngine() {
     std::lock_guard<std::mutex> lock(_scriptEngineLock);
+    _scriptEngineThread.reset(new QThread());
+    _scriptEngineThread->start();
     _scriptEngine = newScriptEngine();
     if (!_scriptEngine) {
         // Failure to create a scripting engine is unexpected; all helper
@@ -22,11 +24,18 @@ HelperScriptEngine::HelperScriptEngine() {
         // packet-based entity networking.
         return;
     }
+    _scriptEngine->setThread(_scriptEngineThread.get());
 }
 
 HelperScriptEngine::~HelperScriptEngine() {
-    std::lock_guard<std::mutex> lock(_scriptEngineLock);
-    if (_scriptEngine) {
-        _scriptEngine.reset();
+    {
+        std::lock_guard<std::mutex> lock(_scriptEngineLock);
+        if (_scriptEngine) {
+            _scriptEngine.reset();
+        }
+    }
+    if (_scriptEngineThread) {
+        _scriptEngineThread->quit();
+        _scriptEngineThread->wait();
     }
 }

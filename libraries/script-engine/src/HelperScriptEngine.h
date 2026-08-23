@@ -22,8 +22,9 @@
  *
  * HelperScriptEngine is used for performing smaller tasks, like for example conversions between entity
  * properties and JSON data.
- * For thread safety all accesses to helper script engine need to be done either through HelperScriptEngine::run()
- * or HelperScriptEngine::runWithResult().
+ * For thread safety the script engine lives on a dedicated thread. All accesses through
+ * HelperScriptEngine::run() or HelperScriptEngine::runWithResult() dispatch to that thread
+ * when called from a different thread, ensuring the QuickJS engine is never used cross-thread.
  *
  */
 
@@ -39,8 +40,13 @@ public:
         if (!_scriptEngine) {
             return;
         }
-        auto scopeGuard = _scriptEngine->getScopeGuard();
-        f();
+        if (QThread::currentThread() == _scriptEngine->thread()) {
+            f();
+        } else {
+            QMetaObject::invokeMethod(_scriptEngine.get(), [&f]() {
+                f();
+            }, Qt::BlockingQueuedConnection);
+        }
     }
 
     template <typename T, typename F>
@@ -51,7 +57,13 @@ public:
             if (!_scriptEngine) {
                 return result;
             }
-            result = f();
+            if (QThread::currentThread() == _scriptEngine->thread()) {
+                result = f();
+            } else {
+                QMetaObject::invokeMethod(_scriptEngine.get(), [&result, &f]() {
+                    result = f();
+                }, Qt::BlockingQueuedConnection);
+            }
         }
         return result;
     }

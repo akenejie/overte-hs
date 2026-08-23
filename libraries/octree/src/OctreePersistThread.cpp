@@ -353,6 +353,17 @@ void OctreePersistThread::sendLatestEntityDataToDS() {
 
     QByteArray data;
     crashDbg("sendLatestEntityDataToDS: calling toJSON...");
+
+    // Skip serialization when the tree has no entities (root is a leaf = empty tree).
+    // This avoids running the QuickJS-based JSON serializer unnecessarily and prevents
+    // a cross-thread STATUS_STACK_BUFFER_OVERRUN crash when the helper script engine
+    // is called from a thread different from the one that created it.
+    if (_tree->getRoot()->isLeaf()) {
+        crashDbg("sendLatestEntityDataToDS: tree is empty, skipping serialization");
+        qDebug() << "Entity tree is empty, skipping serialization to domain server";
+        return;
+    }
+
     if (_tree->toJSON(&data, nullptr, true)) {
         crashDbg(qPrintable(QString("sendLatestEntityDataToDS: toJSON done, data.size=%1").arg(data.size())));
         auto message = NLPacketList::create(PacketType::OctreeDataPersist, QByteArray(), true, true);

@@ -22,7 +22,9 @@ RecurseOctreeToJSONOperator::RecurseOctreeToJSONOperator(const OctreeElementPoin
     _skipDefaults(skipDefaults),
     _skipThoseWithBadParents(skipThoseWithBadParents)
 {
-    _toStringMethod = _engine->evaluate("(function() { return JSON.stringify(this, null, '    ') })");
+    if (_engine) {
+        _toStringMethod = _engine->evaluate("(function() { return JSON.stringify(this, null, '    ') })");
+    }
 }
 
 bool RecurseOctreeToJSONOperator::postRecursion(const OctreeElementPointer& element) {
