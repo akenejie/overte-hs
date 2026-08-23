@@ -56,7 +56,6 @@ signals:
 
 protected slots:
     void process();
-    void handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> message);
 
 protected:
     void persist();
@@ -79,7 +78,6 @@ private:
     quint64 _lastTimeDebug;
 
     QString _persistAsFileType;
-    QByteArray _cachedJSONData;
 };
 
 #endif // hifi_OctreePersistThread_h

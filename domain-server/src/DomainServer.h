@@ -69,9 +69,6 @@ public:
 
     static int const EXIT_CODE_REBOOT;
 
-
-    static const QString REPLACEMENT_FILE_EXTENSION;
-
     bool isAssetServerEnabled();
 
     static bool forceCrashReporting() { return _forceCrashReporting; }
@@ -136,13 +133,6 @@ signals:
 
 private:
     QUuid getID();
-
-    QString getContentBackupDir();
-    QString getEntitiesDirPath();
-    QString getEntitiesFilePath();
-    QString getEntitiesReplacementFilePath();
-
-    void maybeHandleReplacementEntityFile();
 
     void setupNodeListAndAssignments();
 

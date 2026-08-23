@@ -55,9 +55,6 @@
 #include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
 
-#include <Gzip.h>
-
-#include <OctreeDataUtils.h>
 #include <ThreadHelpers.h>
 #include <crash-handler/CrashHandler.h>
 
@@ -69,7 +66,6 @@ Q_LOGGING_CATEGORY(domain_server_ice, "hifi.domain_server.ice")
 Q_LOGGING_CATEGORY(domain_server_auth, "overte.domain_server.auth")
 
 const QString ACCESS_TOKEN_KEY_PATH = "metaverse.access_token";
-const QString DomainServer::REPLACEMENT_FILE_EXTENSION = ".replace";
 const QString& DOMAIN_SERVER_SETTINGS_KEY = "domain_server";
 const QString PUBLIC_SOCKET_ADDRESS_KEY = "network_address";
 const QString PUBLIC_SOCKET_PORT_KEY = "network_port";
@@ -1447,89 +1443,16 @@ void DomainServer::nodePingMonitor() {
 void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessage> message) {
     auto data = message->readAll();
     qDebug() << "Received octree data persist message" << (data.size() / 1000) << "kbytes.";
-    auto filePath = getEntitiesFilePath();
-
-    QDir dir(getEntitiesDirPath());
-    if (!dir.exists()) {
-        qCDebug(domain_server) << "Creating entities content directory:" << dir.absolutePath();
-        dir.mkpath(".");
-    }
-
-    QFile f(filePath);
-    if (f.open(QIODevice::WriteOnly)) {
-        f.write(data);
-#ifdef EXPENSIVE_NETWORK_DIAGNOSTICS
-        // These diagnostics take take more than 200ms (depending on content size),
-        // causing Socket::readPendingDatagrams to overrun its timebox.
-        OctreeUtils::RawEntityData entityData;
-        if (entityData.readOctreeDataInfoFromData(data)) {
-            qCDebug(domain_server) << "Wrote new entities file" << entityData.id << entityData.dataVersion;
-        } else {
-            qCDebug(domain_server) << "Failed to read new octree data info";
-        }
-#endif
-    } else {
-        qCDebug(domain_server) << "Failed to write new entities file:" << filePath;
-    }
-}
-
-QString DomainServer::getContentBackupDir() {
-    return PathUtils::getAppDataFilePath("backups");
-}
-
-QString DomainServer::getEntitiesDirPath() {
-    return PathUtils::getAppDataFilePath("entities");
-}
-
-QString DomainServer::getEntitiesFilePath() {
-    return PathUtils::getAppDataFilePath("entities/models.json.gz");
-}
-
-QString DomainServer::getEntitiesReplacementFilePath() {
-    return getEntitiesFilePath().append(REPLACEMENT_FILE_EXTENSION);
+    // Entity-server is the source of truth. Domain-server does not store entity data on disk.
 }
 
 void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message) {
     qDebug() << "Got request for octree data from " << message->getSenderSockAddr();
 
-    maybeHandleReplacementEntityFile();
-
-    bool remoteHasExistingData { false };
-    QUuid id;
-    int dataVersion;
-    message->readPrimitive(&remoteHasExistingData);
-    if (remoteHasExistingData) {
-        constexpr size_t UUID_SIZE_BYTES = 16;
-        auto idData = message->read(UUID_SIZE_BYTES);
-        id = QUuid::fromRfc4122(idData);
-        message->readPrimitive(&dataVersion);
-        qCDebug(domain_server) << "Entity server does have existing data: ID(" << id << ") DataVersion(" << dataVersion << ")";
-    } else {
-        qCDebug(domain_server) << "Entity server does not have existing data";
-    }
-    auto entityFilePath = getEntitiesFilePath();
-
+    // Entity-server is autonomous and does not request data from domain-server.
+    // This handler exists only for backward compatibility with old entity-servers.
     auto reply = NLPacketList::create(PacketType::OctreeDataFileReply, QByteArray(), true, true);
-    OctreeUtils::RawEntityData data;
-    if (data.readOctreeDataInfoFromFile(entityFilePath)) {
-        if (data.id == id && data.dataVersion <= dataVersion) {
-            qCDebug(domain_server) << "ES has sufficient octree data, not sending data";
-            reply->writePrimitive(false);
-        } else {
-            qCDebug(domain_server) << "Sending newer octree data to ES: ID(" << data.id << ") DataVersion(" << data.dataVersion << ")";
-            QFile file(entityFilePath);
-            if (file.open(QIODevice::ReadOnly)) {
-                reply->writePrimitive(true);
-                reply->write(file.readAll());
-            } else {
-                qCDebug(domain_server) << "Unable to load entity file";
-                reply->writePrimitive(false);
-            }
-        }
-    } else {
-        qCDebug(domain_server) << "Domain server does not have valid octree data";
-        reply->writePrimitive(false);
-    }
+    reply->writePrimitive(false);
 
     auto nodeList = DependencyManager::get<LimitedNodeList>();
     nodeList->sendPacketList(std::move(reply), message->getSenderSockAddr());
@@ -2216,33 +2139,6 @@ void DomainServer::setupGroupCacheRefresh() {
     }
 }
 
-void DomainServer::maybeHandleReplacementEntityFile() {
-    const auto replacementFilePath = getEntitiesReplacementFilePath();
-    OctreeUtils::RawEntityData data;
-    if (!data.readOctreeDataInfoFromFile(replacementFilePath)) {
-        qCWarning(domain_server) << "Replacement file could not be read, it either doesn't exist or is invalid.";
-    } else {
-        qCDebug(domain_server) << "Replacing existing entity date with replacement file";
-
-        QFile replacementFile(replacementFilePath);
-        if (!replacementFile.remove()) {
-            // If we can't remove the replacement file, we are at risk of getting into a state where
-            // we continually replace the primary entity file with the replacement entity file.
-            qCWarning(domain_server) << "Unable to remove replacement file, bailing";
-        } else {
-            data.resetIdAndVersion();
-            auto gzippedData = data.toGzippedByteArray();
-
-            QFile currentFile(getEntitiesFilePath());
-            if (!currentFile.open(QIODevice::WriteOnly)) {
-                qCWarning(domain_server)
-                    << "Failed to update entities data file with replacement file, unable to open entities file for writing";
-            } else {
-                currentFile.write(gzippedData);
-            }
-        }
-    }
-}
 
 
 void DomainServer::processAvatarZonePresencePacket(QSharedPointer<ReceivedMessage> message) {

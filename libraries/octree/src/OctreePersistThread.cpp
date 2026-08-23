@@ -43,6 +43,7 @@ constexpr std::chrono::milliseconds TIME_BETWEEN_PROCESSING { 10 };
 
 constexpr int MAX_OCTREE_REPLACEMENT_BACKUP_FILES_COUNT { 20 };
 constexpr int64_t MAX_OCTREE_REPLACEMENT_BACKUP_FILES_SIZE_BYTES { 50 * 1000 * 1000 };
+static const QString REPLACEMENT_FILE_EXTENSION = ".replace";
 
 static FILE* crashDbgFile = nullptr;
 
@@ -76,149 +77,99 @@ OctreePersistThread::OctreePersistThread(OctreePointer tree, const QString& file
 void OctreePersistThread::start() {
     cleanupOldReplacementBackups();
 
-    auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
-    packetReceiver.registerListener(PacketType::OctreeDataFileReply,
-        PacketReceiver::makeUnsourcedListenerReference<OctreePersistThread>(this, &OctreePersistThread::handleOctreeDataFileReply));
+    // Check for .replace file (placed by asset-server or external tool).
+    QString replacementFilename = _filename + REPLACEMENT_FILE_EXTENSION;
+    if (QFile::exists(replacementFilename)) {
+        qCDebug(octree) << "Found replacement file" << replacementFilename << "- applying";
 
-    auto nodeList = DependencyManager::get<NodeList>();
-    const DomainHandler& domainHandler = nodeList->getDomainHandler();
+        QFile replacementFile(replacementFilename);
+        if (replacementFile.open(QIODevice::ReadOnly)) {
+            QByteArray replacementData = replacementFile.readAll();
+            replacementFile.close();
 
-    auto packet = NLPacket::create(PacketType::OctreeDataFileRequest, -1, true, false);
+            // Remove the replacement file first to avoid re-applying on next restart.
+            if (replacementFile.remove()) {
+                OctreeUtils::RawEntityData data;
+                if (data.readOctreeDataInfoFromData(replacementData)) {
+                    data.resetIdAndVersion();
+                    auto gzippedData = data.toGzippedByteArray();
+                    replaceData(gzippedData);
+                    qCDebug(octree) << "Applied replacement file, reset ID and version";
+                } else {
+                    // Not a valid header, write raw replacement data.
+                    replaceData(replacementData);
+                    qCDebug(octree) << "Applied replacement file (no valid header)";
+                }
+            } else {
+                qCWarning(octree) << "Failed to remove replacement file" << replacementFilename;
+            }
+        } else {
+            qCWarning(octree) << "Failed to open replacement file" << replacementFilename;
+        }
+    }
+
+    // Load tree from the local persist file.
+    qCDebug(octree) << "Loading octree from" << _filename;
 
     OctreeUtils::RawOctreeData data;
-    qCDebug(octree) << "Reading octree data from" << _filename;
+    QByteArray cachedJSONData;
     QFile file(_filename);
     if (file.open(QIODevice::ReadOnly)) {
         QByteArray jsonData(file.readAll());
         file.close();
-        if (!gunzip(jsonData, _cachedJSONData)) {
-            _cachedJSONData = jsonData;
+        if (!gunzip(jsonData, cachedJSONData)) {
+            cachedJSONData = jsonData;
         }
 
-        if (data.readOctreeDataInfoFromData(_cachedJSONData)) {
+        if (data.readOctreeDataInfoFromData(cachedJSONData)) {
             qCDebug(octree) << "Current octree data: ID(" << data.id << ") DataVersion(" << data.dataVersion << ")";
-            packet->writePrimitive(true);
-            auto id = data.id.toRfc4122();
-            packet->write(id);
-            packet->writePrimitive(data.dataVersion);
         } else {
-            _cachedJSONData.clear();
-            qCWarning(octree) << "No octree data found";
-            packet->writePrimitive(false);
+            cachedJSONData.clear();
+            qCWarning(octree) << "No octree data found in file";
         }
     } else {
         qCWarning(octree) << "Couldn't access file" << _filename << file.errorString();
-        packet->writePrimitive(false);
-    }
-
-    qCDebug(octree) << "Sending OctreeDataFileRequest to DS";
-    nodeList->sendPacket(std::move(packet), domainHandler.getSockAddr());
-}
-
-void OctreePersistThread::handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> message) {
-    if (_initialLoadComplete) {
-        qCWarning(octree) << "Received OctreeDataFileReply after initial load had completed";
-        return;
-    }
-
-    bool includesNewData;
-    message->readPrimitive(&includesNewData);
-    QByteArray replacementData;
-    OctreeUtils::RawOctreeData data;
-    bool hasValidOctreeData { false };
-    if (includesNewData) {
-        _cachedJSONData.clear();
-        replacementData = message->readAll();
-        replaceData(replacementData);
-        hasValidOctreeData = data.readOctreeDataInfoFromFile(_filename);
-        qDebug() << "Got OctreeDataFileReply, new data sent";
-    } else {
-        qDebug() << "Got OctreeDataFileReply, current entity data is sufficient";
-        
-        OctreeUtils::RawEntityData data;
-        qCDebug(octree) << "Reading octree data from" << _filename;
-        if (data.readOctreeDataInfoFromData(_cachedJSONData)) {
-            hasValidOctreeData = true;
-            if (data.id.isNull()) {
-                qCDebug(octree) << "Current octree data has a null id, updating";
-                data.resetIdAndVersion();
-
-                QFile file(_filename);
-                if (file.open(QIODevice::WriteOnly)) {
-                    auto entityData = data.toGzippedByteArray();
-                    file.write(entityData);
-                    file.close();
-                } else {
-                    qCDebug(octree) << "Failed to update octree data";
-                }
-            }
-        }
     }
 
     quint64 loadStarted = usecTimestampNow();
 
-    if (hasValidOctreeData) {
-        qDebug() << "Setting entity version info to: " << data.id << data.dataVersion;
+    if (!data.id.isNull()) {
+        qDebug() << "Setting entity version info to:" << data.id << data.dataVersion;
         _tree->setOctreeVersionInfo(data.id, data.dataVersion);
     }
 
     bool persistentFileRead;
-
-    crashDbg("handleOctreeDataFileReply: about to load tree from file/stream");
     _tree->withWriteLock([&] {
         PerformanceWarning warn(true, "Loading Octree File", true);
 
-        if (_cachedJSONData.isEmpty()) {
+        if (cachedJSONData.isEmpty()) {
             persistentFileRead = _tree->readFromFile(_filename.toLocal8Bit().constData());
         } else {
-            QDataStream jsonStream(_cachedJSONData);
+            QDataStream jsonStream(cachedJSONData);
             persistentFileRead = _tree->readFromStream(-1, jsonStream);
         }
         _tree->pruneTree();
     });
 
-    _cachedJSONData.clear();
     quint64 loadDone = usecTimestampNow();
     _loadTimeUSecs = loadDone - loadStarted;
 
-    _tree->clearDirtyBit(); // the tree is clean since we just loaded it
+    _tree->clearDirtyBit();
 
     unsigned long nodeCount = OctreeElement::getNodeCount();
     unsigned long internalNodeCount = OctreeElement::getInternalNodeCount();
     unsigned long leafNodeCount = OctreeElement::getLeafNodeCount();
     qCDebug(octree, "Nodes after loading scene %lu nodes %lu internal %lu leaves", nodeCount, internalNodeCount, leafNodeCount);
 
-    bool wantDebug = false;
-    if (wantDebug) {
-        double usecPerGet = (double)OctreeElement::getGetChildAtIndexTime() 
-                                / (double)OctreeElement::getGetChildAtIndexCalls();
-        qCDebug(octree) << "getChildAtIndexCalls=" << OctreeElement::getGetChildAtIndexCalls()
-                << " getChildAtIndexTime=" << OctreeElement::getGetChildAtIndexTime() << " perGet=" << usecPerGet;
-
-        double usecPerSet = (double)OctreeElement::getSetChildAtIndexTime() 
-                                / (double)OctreeElement::getSetChildAtIndexCalls();
-        qCDebug(octree) << "setChildAtIndexCalls=" << OctreeElement::getSetChildAtIndexCalls()
-                << " setChildAtIndexTime=" << OctreeElement::getSetChildAtIndexTime() << " perSet=" << usecPerSet;
-    }
-
     _initialLoadComplete = true;
-
-    // Since we just loaded the persistent file, we can consider ourselves as having just persisted
     _lastPersistCheck = std::chrono::steady_clock::now();
 
-    if (replacementData.isNull()) {
-        crashDbg("handleOctreeDataFileReply: calling sendLatestEntityDataToDS...");
-        sendLatestEntityDataToDS();
-        crashDbg("handleOctreeDataFileReply: sendLatestEntityDataToDS returned");
-    }
+    sendLatestEntityDataToDS();
 
     QTimer::singleShot(TIME_BETWEEN_PROCESSING.count(), this, &OctreePersistThread::process);
 
-    crashDbg("handleOctreeDataFileReply: emitting loadCompleted...");
     emit loadCompleted();
-    crashDbg("handleOctreeDataFileReply: loadCompleted emitted");
 }
-
 
 QString OctreePersistThread::getPersistFileMimeType() const {
     if (_persistAsFileType == "json") {
