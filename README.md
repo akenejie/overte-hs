@@ -1,95 +1,55 @@
-<!--
-Copyright 2013-2019 High Fidelity, Inc.
-Copyright 2019-2021 Vircadia contributors
-Copyright 2021-2025 Overte e.V.
-SPDX-License-Identifier: Apache-2.0
--->
+# Overte Headless-Server (Unofficial) (日本語)
 
-<p align="center"><a href="https://overte.org/"><picture><source srcset="interface/resources/images/brand-banner.svg" alt="Overte" width="350" media="(prefers-color-scheme: dark)"><img src="interface/resources/images/brand-banner-black.svg" alt="Overte" width="350"></picture></a></p>
+> [!CAUTION]
+> このプロジェクトは動作確認が完了していないアルファ版です。
 
-<h3 align="center"><a href="https://overte.org/">Website</a> | <a href="https://matrix.to/#/#overte:matrix.org">Matrix</a> | <a href="https://overte.org/downloads.html">Download</a></h3>
-<p align="center">
-    <a href="https://docs.overte.org/en/latest/contribute.html"><img alt="GitHub contributors" src="https://img.shields.io/github/contributors/overte-org/overte"></a>
-    <a href="https://github.com/overte-org/overte/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/overte-org/overte"></a>
-    <a href="https://github.com/overte-org/overte/network"><img alt="GitHub forks" src="https://img.shields.io/github/forks/overte-org/overte"></a>
-    <a href="https://www.apache.org/licenses/LICENSE-2.0"><img alt="Apache 2.0" src="https://img.shields.io/badge/license-Apache--2.0-%230A7BBB?style=flat"></a>
-    <a href="https://matrix.to/#/#overte:overte.org"><img alt="Matrix" src="https://img.shields.io/matrix/overte_general:matrix.org?label=Matrix%20chat"></a>
-    <a href="https://depot.dev/?utm_source=Overte"><img alt="Built with Depot" src="https://depot.dev/badges/built-with-depot.svg"></a>
-</p>
-<h3 align="center">Build Status</h3>
-<p align="center">
-    <a href="https://github.com/overte-org/overte/actions/workflows/build.yml"><img alt="Nightly CI Build" src="https://github.com/overte-org/overte/actions/workflows/build.yml/badge.svg?event=schedule"></a>
-    <a href="https://github.com/overte-org/overte/actions/workflows/master_deploy_apidocs.yml"><img alt="API-docs CI Build & Deploy" src="https://github.com/overte-org/overte/actions/workflows/master_deploy_apidocs.yml/badge.svg"></a>
-    <a href="https://github.com/overte-org/overte/actions/workflows/master_deploy_doxygen.yml"><img alt="Doxygen CI Build & Deploy" src="https://github.com/overte-org/overte/actions/workflows/master_deploy_doxygen.yml/badge.svg"></a>
-</p>
+## コンセプト：情報は物理に縛られるべきか？
 
-### What is this?
+皆さんはVRを楽しんでいますか？
+距離を越えて、東京、大阪、あるいは海外にいる人とも同じ空間を共有できる。本当に素晴らしい技術です。中でもOverteの最大の強みは、「特定の大企業が管理するプラットフォーム」ではなく、「あなた自身が管理・所有できる空間」を持てることでしょう。
 
-Overte is a free and open source 3D social virtual worlds software.
+しかし、ここで一つ問いかけさせてください。
 
-* Desktop and VR use
-* Hundreds of users simultaneously
-* Collaborative in-world creation
-* Full-body avatars
-* FBX, glTF, and OBJ support
-* JavaScript scripting engine
-* 256km²/4096km³ world space in a server
-* Fully self-hosted
-* Apache 2.0
+**その「あなたの部屋」は、いま何に依存して生きていますか？**
 
-### Releases
+誰かのパソコンでホストしていますか？
+もしそのマシンの電源が落ちてしまったら、その空間にはもうアクセスできないのでしょうか？
+あなたのVR空間の命は、特定のハードウェアという「物理」に縛り付けられてしまっていませんか？
 
-[View Releases (and pre-releases) here](https://github.com/overte-org/overte/releases/)
+本来、情報とは特定の物理媒体に縛られるべきものではなく、もっと流動的であるべきです。
+もし、「特定のマシンに依存しない部屋」を作ることができたなら。あるサーバーが使えなくなっても、別の誰かのパソコンでさっと立ち上げ直すだけで空間が蘇るなら、そのVR空間は生き続けていると言えます。それはまるで人間の記憶のように、誰か1人が引き継いでさえいれば、その情報（空間）は死なないのです。
 
-### How to deploy a Server
+そこで私は、Overteのポータブルなヘッドレス・サーバー化を構想しました。
 
-- [For Windows and Linux](https://docs.overte.org/en/latest/host.html)
+このプロジェクトが目指すのは、インストール作業をはじめとした環境依存からの脱却です。
+- **単一の実行ファイル**で構成され、インストールは不要。
+- **管理者権限不要**で、ポート番号を指定するだけで即座にlocalhostでVR空間をホスト。
+- **完全なポータビリティ**: 空間に関する全データは、実行ファイルと同階層の `data/` フォルダ内に保存。
 
-### Building
+つまり、この `data/` フォルダさえ別のマシンにコピーすれば、OSやCPUの違いを一切問わず、全く同じ部屋をどこでもホストできるようにしたいということです。
 
-#### How to build the Interface
+## 使い方（基本）
+使い方の基本としては、以下のように各機能のポートを指定して呼び出します。
 
-- [For Windows](https://github.com/overte-org/overte/blob/master/BUILD_WIN.md)
-- [For Mac](https://github.com/overte-org/overte/blob/master/BUILD_OSX.md)
-- [For Linux](https://github.com/overte-org/overte/blob/master/BUILD_LINUX.md)
-- [For Linux - Overte Builder](https://github.com/overte-org/overte-builder)
+```bash
+overte-hs --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --assets 40106 --entity-script 40107 --messages 40108
+```
+これで指定した各ポート（domain: 40102, audio: 40103...）に役割が割り当てられ、VR空間が鼓動し始めます。
 
-#### How to build a Server
+### 空間の分離と分散
+生成された `data` フォルダ内では、サーバーごとの役割が明確に分割されています。
 
-- [For Windows](https://github.com/overte-org/overte/blob/master/BUILD_WIN.md)
-- [For Linux](https://github.com/overte-org/overte/blob/master/BUILD_LINUX.md)
-- [For Linux - Overte Builder](https://github.com/overte-org/overte-builder)
+| サーバー機能 | Dataフォルダ内の保存先 |
+| --- | --- |
+| domain | `domain/` |
+| asset | `assets/` |
+| entity | `entities/` |
 
-#### How to generate an Installer
+これは単なる整理ではなく、「空間を構成する要素を、別々のマシンに分散させることができる」ということを意味します。（これはOverte本家にもある思想の再整理です。）
 
-- [For Windows - Interface & Server](https://github.com/overte-org/overte/blob/master/INSTALLER.md)
-- [For Mac - Interface](https://github.com/overte-org/overte/blob/master/INSTALLER.md)
-- [For Linux - Interface AppImage & Server .deb/.rpm - Overte Builder](https://github.com/overte-org/overte/blob/master/INSTALLER.md)
+例えば、特定のデータフォルダ（ここでは`assets/`）だけを別のマシンにコピーし、以下のようにコマンドを打ってみてください:
+```
+overte-hs --host 192.168.1.5:40102 --assets 40106
+```
 
-### Mission statement
-
-Overte aims to provide social virtual worlds experiences with entirely free and open source infrastructure.
-
-### Technical details
-
-Overte consists of many projects and codebases with its unifying structure's goal being free and open source self-hosted virtual worlds.
-
-- The Interface - You are here!
-- The Server - You are also here!
-- [The Directory Server (Codename Iamus)](https://github.com/overte-org/overte-metaverse/)
-- [The Directory Server Dashboard (Codename Iamus)](https://github.com/overte-org/metaverse-dashboard/)
-- [Our downstream Conan recipies](https://github.com/overte-org/overte-conan-recipes)
-
-#### Tools
-- [Overte Builder for Linux](https://github.com/overte-org/overte-builder/)
-
-#### Documentation
-- [User Documentation](https://github.com/overte-org/overte-docs-sphinx/)
-- [API Documentation (JavaScript)](https://apidocs.overte.org/) - Generated using JSDoc [here](https://github.com/overte-org/overte/tree/master/tools/jsdoc).
-- [Doxygen (C++)](https://doxygen.overte.org/)
-
-### Contribution
-
-There are many contributors to Overte.
-Code writers, reviewers, testers, documentation writers, modellers, and general supporters of the project are all integral to its development and success towards its goals.
-Find out how you can [contribute](https://docs.overte.org/en/latest/contribute.html)!
+これにより、「大元のDomainサーバーは `192.168.1.5:40102` に存在しているが、その部屋のAssets機能だけは今このマシンで処理（ホスト）する」といった分散構成が可能になります。
