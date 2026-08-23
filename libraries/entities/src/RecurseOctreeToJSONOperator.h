@@ -30,7 +30,6 @@ private:
     void processEntity(const EntityItemPointer& entity);
 
     ScriptEngine* _engine;
-    ScriptValue _toStringMethod;
 
     QString _json;
     const bool _skipDefaults;

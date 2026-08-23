@@ -15,6 +15,11 @@
 #include "EntityItemProperties.h"
 #include <ScriptValue.h>
 
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonValue>
+
 RecurseOctreeToJSONOperator::RecurseOctreeToJSONOperator(const OctreeElementPointer&, ScriptEngine* engine,
     QString jsonPrefix, bool skipDefaults, bool skipThoseWithBadParents):
     _engine(engine),
@@ -22,9 +27,9 @@ RecurseOctreeToJSONOperator::RecurseOctreeToJSONOperator(const OctreeElementPoin
     _skipDefaults(skipDefaults),
     _skipThoseWithBadParents(skipThoseWithBadParents)
 {
-    if (_engine) {
-        _toStringMethod = _engine->evaluate("(function() { return JSON.stringify(this, null, '    ') })");
-    }
+    // Intentionally empty: we now use QJsonDocument for serialization
+    // instead of calling _engine->evaluate() which crashes with
+    // STATUS_STACK_BUFFER_OVERRUN on Windows due to a QuickJS bug.
 }
 
 bool RecurseOctreeToJSONOperator::postRecursion(const OctreeElementPointer& element) {
@@ -39,9 +44,13 @@ void RecurseOctreeToJSONOperator::processEntity(const EntityItemPointer& entity)
         return;  // we weren't able to resolve a parent from _parentID, so don't save this entity.
     }
 
-    ScriptValue qScriptValues = _skipDefaults
-        ? EntityItemNonDefaultPropertiesToScriptValue(_engine, entity->getProperties())
-        : EntityItemPropertiesToScriptValue(_engine, entity->getProperties());
+    QVariantMap propertiesMap;
+    {
+        ScriptValue qScriptValues = _skipDefaults
+            ? EntityItemNonDefaultPropertiesToScriptValue(_engine, entity->getProperties())
+            : EntityItemPropertiesToScriptValue(_engine, entity->getProperties());
+        propertiesMap = qScriptValues.toVariant().toMap();
+    }
 
     if (_comma) {
         _json += ',';
@@ -49,7 +58,5 @@ void RecurseOctreeToJSONOperator::processEntity(const EntityItemPointer& entity)
     _comma = true;
     _json += "\n    ";
 
-    // Override default toString():
-    qScriptValues.setProperty("toString", _toStringMethod);
-    _json += qScriptValues.toString();
+    _json += QJsonDocument(QJsonObject::fromVariantMap(propertiesMap)).toJson(QJsonDocument::Indented);
 }
