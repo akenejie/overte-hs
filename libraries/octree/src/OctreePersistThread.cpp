@@ -309,7 +309,8 @@ void OctreePersistThread::sendLatestEntityDataToDS() {
     // This avoids running the QuickJS-based JSON serializer unnecessarily and prevents
     // a cross-thread STATUS_STACK_BUFFER_OVERRUN crash when the helper script engine
     // is called from a thread different from the one that created it.
-    if (_tree->getRoot()->isLeaf()) {
+    auto root = _tree->getRoot();
+    if (root && root->isLeaf() && !root->hasContent()) {
         crashDbg("sendLatestEntityDataToDS: tree is empty, skipping serialization");
         qDebug() << "Entity tree is empty, skipping serialization to domain server";
         return;

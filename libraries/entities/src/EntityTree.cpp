@@ -548,7 +548,7 @@ EntityItemPointer EntityTree::addEntity(const EntityItemID& entityID, const Enti
 
     auto nodeList = DependencyManager::get<NodeList>();
     if (!nodeList) {
-        qCDebug(entities) << "EntityTree::addEntity -- can't get NodeList";
+        qWarning() << "EntityTree::addEntity -- can't get NodeList for entity" << entityID;
         return nullptr;
     }
 
@@ -2752,10 +2752,12 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
     QVariantList entitiesQList = map["Entities"].toList();
 
     if (entitiesQList.length() == 0) {
-        qCDebug(entities) << "EntityTree::readFromMap: entitiesQList.length() == 0, Empty map or invalidly formed file";
+        qWarning() << "EntityTree::readFromMap: entitiesQList.length() == 0, Empty map or invalidly formed file. Map keys:" << map.keys();
         // Empty map or invalidly formed file.
         return false;
     }
+
+    qWarning() << "EntityTree::readFromMap: loading" << entitiesQList.length() << "entities from map";
 
     QMap<QUuid, QVector<QUuid>> cloneIDs;
 
@@ -2786,6 +2788,10 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
         } else {
             entityItemID = EntityItemID(QUuid::createUuid());
         }
+
+        qWarning() << "EntityTree::readFromMap: entity" << entityItemID << "type:" << properties.getType()
+                   << "pos:" << properties.getPosition() << "dims:" << properties.getDimensions()
+                   << "mapKeys:" << entityMap.keys();
 
         // Convert old clientOnly bool to new entityHostType enum
         // (must happen before setOwningAvatarID below)
@@ -2909,8 +2915,10 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
 
         EntityItemPointer entity = addEntity(entityItemID, properties, isImport);
         if (!entity) {
-            qCDebug(entities) << "adding Entity failed:" << entityItemID << properties.getType();
+            qWarning() << "adding Entity FAILED:" << entityItemID << "type:" << properties.getType();
             success = false;
+        } else {
+            qWarning() << "adding Entity OK:" << entityItemID << "type:" << properties.getType();
         }
 
         if (entity) {
