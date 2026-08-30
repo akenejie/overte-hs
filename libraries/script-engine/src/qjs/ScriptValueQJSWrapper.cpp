@@ -335,7 +335,7 @@ QList<QString> ScriptValueQJSWrapper::getPropertyNames() const {
     }
     JSPropertyEnum* tab = nullptr;
     uint32_t len = 0;
-    if (JS_GetOwnPropertyNames(ctx, &tab, &len, value(), 0) < 0) {
+    if (JS_GetOwnPropertyNames(ctx, &tab, &len, value(), JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) < 0) {
         _engine->clearPendingException();
         return names;
     }

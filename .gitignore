@@ -145,3 +145,5 @@ interface/compiledResources
 # Flatpak
 /repo/
 /.flatpak-builder/
+
+*.log
