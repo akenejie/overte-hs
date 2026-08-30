@@ -16,7 +16,6 @@
 
 #include <QJsonDocument>
 #include <QProcess>
-#include <QSharedMemory>
 #include <QThread>
 #include <QTimer>
 
@@ -46,8 +45,7 @@ const long long ASSIGNMENT_REQUEST_INTERVAL_MSECS = 1 * 1000;
 
 AssignmentClient::AssignmentClient(Assignment::Type requestAssignmentType, QString assignmentPool,
                                    quint16 listenPort, QString assignmentServerHostname,
-                                   quint16 assignmentServerPort, quint16 assignmentMonitorPort,
-                                   bool disableDomainPortAutoDiscovery) :
+                                   quint16 assignmentServerPort, quint16 assignmentMonitorPort) :
     _assignmentServerHostname(DEFAULT_ASSIGNMENT_SERVER_HOSTNAME)
 {
     LogUtils::init();
@@ -84,13 +82,6 @@ AssignmentClient::AssignmentClient(Assignment::Type requestAssignmentType, QStri
     }
     _assignmentServerSocket.setObjectName("AssignmentServer");
     nodeList->setAssignmentServerSocket(_assignmentServerSocket);
-
-    if (disableDomainPortAutoDiscovery) {
-        _disableDomainPortAutoDiscovery = disableDomainPortAutoDiscovery;
-        qCDebug(assignment_client) << "Disabling domain port auto discovery by the assignment client due to parsed command line parameter.";
-    }
-
-    nodeList->disableDomainPortAutoDiscovery(_disableDomainPortAutoDiscovery);
 
     qCDebug(assignment_client) << "Assignment server socket is" << _assignmentServerSocket;
 
@@ -200,28 +191,6 @@ void AssignmentClient::sendAssignmentRequest() {
         crash::annotations::setShutdownState(false);
 
         auto nodeList = DependencyManager::get<NodeList>();
-
-        if (_assignmentServerHostname == "localhost" && !_disableDomainPortAutoDiscovery) {
-            // we want to check again for the local domain-server port in case the DS has restarted
-            quint16 localAssignmentServerPort;
-            if (nodeList->getLocalServerPortFromSharedMemory(DOMAIN_SERVER_LOCAL_PORT_SMEM_KEY, localAssignmentServerPort)) {
-                if (localAssignmentServerPort == 0) {
-                    qCWarning(assignment_client) << "ALERT: Server port from shared memory is 0";
-                } else {
-                    if (localAssignmentServerPort != _assignmentServerSocket.getPort()) {
-                        qCDebug(assignment_client) << "Port for local assignment server read from shared memory is"
-                            << localAssignmentServerPort;
-
-                        _assignmentServerSocket.setPort(localAssignmentServerPort);
-                        nodeList->setAssignmentServerSocket(_assignmentServerSocket);
-                    }
-                }
-            } else {
-                qCWarning(assignment_client) << "ALERT: Failed to read local assignment server port from shared memory ("
-                    << DOMAIN_SERVER_LOCAL_PORT_SMEM_KEY
-                    << ")- will send assignment request to previous assignment server socket.";
-            }
-        }
 
         nodeList->sendAssignment(_requestAssignment);
     }

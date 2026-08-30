@@ -28,7 +28,6 @@
 #include <QtCore/QPointer>
 #include <QtCore/QReadWriteLock>
 #include <QtCore/QSet>
-#include <QtCore/QSharedMemory>
 #include <QtCore/QSharedPointer>
 #include <QtNetwork/QUdpSocket>
 #include <QtNetwork/QHostAddress>
@@ -59,10 +58,6 @@ const char DEFAULT_ASSIGNMENT_SERVER_HOSTNAME[] = "localhost";
 
 const char STUN_SERVER_HOSTNAME[] = "stun1.l.google.com";
 const unsigned short STUN_SERVER_PORT = NetworkingConstants::STUN_SERVER_DEFAULT_PORT;
-
-const QString DOMAIN_SERVER_LOCAL_PORT_SMEM_KEY = "domain-server.local-port";
-const QString DOMAIN_SERVER_LOCAL_HTTP_PORT_SMEM_KEY = "domain-server.local-http-port";
-const QString DOMAIN_SERVER_LOCAL_HTTPS_PORT_SMEM_KEY = "domain-server.local-https-port";
 
 const QHostAddress DEFAULT_ASSIGNMENT_CLIENT_MONITOR_HOSTNAME = QHostAddress::LocalHost;
 
@@ -305,9 +300,6 @@ public:
             functor(it->second);
         }
     }
-
-    void putLocalPortIntoSharedMemory(const QString key, QObject* parent, quint16 localPort);
-    bool getLocalServerPortFromSharedMemory(const QString key, quint16& localPort);
 
     const QMap<quint64, ConnectionStep> getLastConnectionTimes() const
         { QReadLocker readLock(&_connectionTimeLock); return _lastConnectionTimes; }

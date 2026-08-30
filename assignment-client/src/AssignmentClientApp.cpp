@@ -95,10 +95,6 @@ AssignmentClientApp::AssignmentClientApp(int argc, char* argv[]) :
     const QCommandLineOption logDirectoryOption(ASSIGNMENT_LOG_DIRECTORY, "directory to store logs", "log-directory");
     parser.addOption(logDirectoryOption);
 
-    const QCommandLineOption disableDomainPortAutoDiscoveryOption(ASSIGNMENT_DISABLE_DOMAIN_AUTO_PORT_DISCOVERY,
-        "assignment clients automatically search for the domain server on the local machine, if networking is being managed, then disable automatic discovery of the domain server port");
-    parser.addOption(disableDomainPortAutoDiscoveryOption);
-
     const QCommandLineOption parentPIDOption(PARENT_PID_OPTION, "PID of the parent process", "parent-pid");
     parser.addOption(parentPIDOption);
 
@@ -167,11 +163,6 @@ AssignmentClientApp::AssignmentClientApp(int argc, char* argv[]) :
     QString logDirectory;
     if (parser.isSet(logDirectoryOption)) {
         logDirectory = parser.value(logDirectoryOption);
-    }
-
-    bool disableDomainPortAutoDiscovery = false;
-    if (parser.isSet(disableDomainPortAutoDiscoveryOption)) {
-        disableDomainPortAutoDiscovery = true;
     }
 
 
@@ -268,14 +259,13 @@ AssignmentClientApp::AssignmentClientApp(int argc, char* argv[]) :
                                                                         requestAssignmentType, assignmentPool, listenPort,
                                                                         childMinListenPort, assignmentServerHostname,
                                                                         assignmentServerPort, logDirectory,
-                                                                        disableDomainPortAutoDiscovery, logOptions);
+                                                                        logOptions);
         monitor->setParent(this);
         connect(this, &QCoreApplication::aboutToQuit, monitor, &AssignmentClientMonitor::aboutToQuit);
     } else {
         AssignmentClient* client = new AssignmentClient(requestAssignmentType, assignmentPool, listenPort,
                                                         assignmentServerHostname,
-                                                        assignmentServerPort, monitorPort,
-                                                        disableDomainPortAutoDiscovery);
+                                                        assignmentServerPort, monitorPort);
         client->setParent(this);
         connect(this, &QCoreApplication::aboutToQuit, client, &AssignmentClient::aboutToQuit);
     }

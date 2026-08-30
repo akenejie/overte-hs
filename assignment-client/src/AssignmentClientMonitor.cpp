@@ -43,7 +43,7 @@ AssignmentClientMonitor::AssignmentClientMonitor(const unsigned int numAssignmen
                                                  Assignment::Type requestAssignmentType, QString assignmentPool,
                                                  quint16 listenPort, quint16 childMinListenPort, QString assignmentServerHostname,
                                                  quint16 assignmentServerPort, QString logDirectory,
-                                                 bool disableDomainPortAutoDiscovery, QString logOptions) :
+                                                 QString logOptions) :
     _numAssignmentClientForks(numAssignmentClientForks),
     _minAssignmentClientForks(minAssignmentClientForks),
     _maxAssignmentClientForks(maxAssignmentClientForks),
@@ -52,7 +52,6 @@ AssignmentClientMonitor::AssignmentClientMonitor(const unsigned int numAssignmen
     _assignmentServerHostname(assignmentServerHostname),
     _assignmentServerPort(assignmentServerPort),
     _childMinListenPort(childMinListenPort),
-    _disableDomainPortAutoDiscovery(disableDomainPortAutoDiscovery),
     _logOptions(logOptions)
 {
     qDebug() << "_requestAssignmentType =" << _requestAssignmentType;
@@ -195,9 +194,6 @@ void AssignmentClientMonitor::spawnChildClient() {
     if (_requestAssignmentType != Assignment::AllTypes) {
         _childArguments.append("--" + ASSIGNMENT_TYPE_OVERRIDE_OPTION);
         _childArguments.append(QString::number(_requestAssignmentType));
-    }
-    if (_disableDomainPortAutoDiscovery) {
-        _childArguments.append("--" + ASSIGNMENT_DISABLE_DOMAIN_AUTO_PORT_DISCOVERY);
     }
 
     if (listenPort) {

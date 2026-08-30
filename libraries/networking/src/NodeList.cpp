@@ -373,18 +373,6 @@ void NodeList::sendDomainServerCheckIn() {
             auto hostname = _domainHandler.getHostname();
             QMetaEnum metaEnum = QMetaEnum::fromType<LimitedNodeList::ConnectReason>();
             qCDebug(networking_ice) << "Sending connect request ( REASON:" << QString(metaEnum.valueToKey(_connectReason)) << ") to domain-server at" << hostname;
-
-            // is this our localhost domain-server?
-            // if so we need to make sure we have an up-to-date local port in case it restarted
-
-            if ((domainSockAddr.getAddress() == QHostAddress::LocalHost || hostname == "localhost")
-                && _domainPortAutoDiscovery) {
-
-                quint16 domainPort = DEFAULT_DOMAIN_SERVER_PORT;
-                getLocalServerPortFromSharedMemory(DOMAIN_SERVER_LOCAL_PORT_SMEM_KEY, domainPort);
-                qCDebug(networking_ice) << "Local domain-server port read from shared memory (or default) is" << domainPort;
-                _domainHandler.setPort(domainPort);
-            }
         }
 
         // check if we're missing a keypair we need to verify ourselves with the domain-server

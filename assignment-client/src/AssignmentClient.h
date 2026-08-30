@@ -21,15 +21,12 @@
 
 #include "ThreadedAssignment.h"
 
-class QSharedMemory;
-
 class AssignmentClient : public QObject {
     Q_OBJECT
 public:
     AssignmentClient(Assignment::Type requestAssignmentType, QString assignmentPool,
                      quint16 listenPort, QString assignmentServerHostname,
-                     quint16 assignmentServerPort, quint16 assignmentMonitorPort,
-                     bool disableDomainPortAutoDiscovery);
+                     quint16 assignmentServerPort, quint16 assignmentMonitorPort);
     ~AssignmentClient();
 
 public slots:
@@ -64,7 +61,6 @@ private:
     QTimer _requestTimer; // timer for requesting and assignment
     QTimer _statsTimerACM; // timer for sending stats to assignment client monitor
     QUuid _childAssignmentUUID = QUuid::createUuid();
-    bool _disableDomainPortAutoDiscovery { false };
 
  protected:
     SockAddr _assignmentClientMonitorSocket;

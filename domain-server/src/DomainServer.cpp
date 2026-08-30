@@ -24,7 +24,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QProcess>
-#include <QSharedMemory>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTimer>
@@ -510,10 +509,6 @@ void DomainServer::setupNodeListAndAssignments() {
 
     auto nodeList = DependencyManager::set<LimitedNodeList>(domainServerPort, domainServerDTLSPort);
 
-    // no matter the local port, save it to shared mem so that local assignment clients can ask what it is
-    nodeList->putLocalPortIntoSharedMemory(DOMAIN_SERVER_LOCAL_PORT_SMEM_KEY, this,
-        nodeList->getSocketLocalPort(SocketType::UDP));
-
     // set our LimitedNodeList UUID to match the UUID from our config
     // nodes will currently use this to add resources to data-web that relate to our domain
     bool isMetaverseDomain = false;
@@ -549,10 +544,6 @@ void DomainServer::setupNodeListAndAssignments() {
 
     connect(nodeList.data(), &LimitedNodeList::nodeAdded, this, &DomainServer::nodeAdded);
     connect(nodeList.data(), &LimitedNodeList::nodeKilled, this, &DomainServer::nodeKilled);
-    connect(nodeList.data(), &LimitedNodeList::localSockAddrChanged, this,
-        [this](const SockAddr& localSockAddr) {
-        DependencyManager::get<LimitedNodeList>()->putLocalPortIntoSharedMemory(DOMAIN_SERVER_LOCAL_PORT_SMEM_KEY, this, localSockAddr.getPort());
-    });
 
     // register as the packet receiver for the types we want
     PacketReceiver& packetReceiver = nodeList->getPacketReceiver();

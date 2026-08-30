@@ -40,7 +40,7 @@ public:
                             const unsigned int maxAssignmentClientForks, Assignment::Type requestAssignmentType,
                             QString assignmentPool, quint16 listenPort, quint16 childMinListenPort,
                             QString assignmentServerHostname, quint16 assignmentServerPort,
-                            QString logDirectory, bool disableDomainPortAutoDiscovery, QString logOptions);
+                            QString logDirectory, QString logOptions);
     ~AssignmentClientMonitor();
 
     void stopChildProcesses();
@@ -78,7 +78,6 @@ private:
     QSet<quint16> _childListenPorts;
 
     bool _wantsChildFileLogging { false };
-    bool _disableDomainPortAutoDiscovery { false };
 
     QString _logOptions;
 };
