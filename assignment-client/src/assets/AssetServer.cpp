@@ -24,6 +24,7 @@
 #include <QtCore/QFileInfo>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QSaveFile>
+#include <QtCore/QSharedMemory>
 #include <QtCore/QString>
 #include <QtCore/QVector>
 #include <QtCore/QUrlQuery>
