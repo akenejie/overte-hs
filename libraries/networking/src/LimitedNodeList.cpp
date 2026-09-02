@@ -15,6 +15,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
+#include <array>
 
 #include <QtCore/QDataStream>
 #include <QtCore/QDebug>
@@ -980,23 +981,66 @@ void LimitedNodeList::sampleConnectionStats() {
     }
 }
 
+namespace {
+    // Public, widely-reachable DNS recursive resolvers used only to learn the outbound
+    // (egress) source IP of this machine so its P2P reachability can be advertised. They are
+    // tried in order; the first that accepts a TCP:53 connection supplies the source address.
+    // Composed of several independent operators (including non-profit resolvers such as
+    // Quad9 and DNS.WATCH) so we do not depend on any single external party.
+    const std::array<const char*, 12> RELIABLE_LOCAL_IP_CHECK_HOSTS = {
+        "9.9.9.9",          // Quad9 (non-profit foundation)
+        "149.112.112.112",  // Quad9
+        "84.200.69.80",     // DNS.WATCH (non-profit)
+        "84.200.70.40",     // DNS.WATCH
+        "8.8.8.8",          // Google
+        "8.8.4.4",          // Google
+        "1.1.1.1",          // Cloudflare
+        "1.0.0.1",          // Cloudflare
+        "94.140.14.14",     // AdGuard
+        "94.140.15.15",     // AdGuard
+        "208.67.222.222",   // OpenDNS (Cisco)
+        "208.67.220.220"    // OpenDNS
+    };
+    constexpr int RELIABLE_LOCAL_IP_CHECK_PORT = 53;
+}
+
 void LimitedNodeList::updateLocalSocket() {
     // when update is called, if the local socket is empty then start with the guessed local socket
     if (_localSockAddr.isNull()) {
         setLocalSocket(SockAddr { SocketType::UDP, getGuessedLocalAddress(), _nodeSocket.localPort(SocketType::UDP) });
     }
 
-    // attempt to use Google's DNS to confirm that local IP
-    static const QHostAddress RELIABLE_LOCAL_IP_CHECK_HOST = QHostAddress { "8.8.8.8" };
-    static const int RELIABLE_LOCAL_IP_CHECK_PORT = 53;
+    // start a fresh attempt at the first candidate
+    _localSocketCheckHostIndex = 0;
+    attemptLocalSocketCheckForward();
+}
 
-    QTcpSocket* localIPTestSocket = new QTcpSocket;
+void LimitedNodeList::attemptLocalSocketCheckForward() {
+    // cancel any check that was still in-flight from a previous update cycle
+    if (_localSocketCheckSocket) {
+        _localSocketCheckSocket->abort();
+        _localSocketCheckSocket->deleteLater();
+        _localSocketCheckSocket.clear();
+    }
 
-    connect(localIPTestSocket, &QTcpSocket::connected, this, &LimitedNodeList::connectedForLocalSocketTest);
-    connect(localIPTestSocket, &QTcpSocket::errorOccurred, this, &LimitedNodeList::errorTestingLocalSocket);
+    if (_localSocketCheckHostIndex < (int)RELIABLE_LOCAL_IP_CHECK_HOSTS.size()) {
+        QTcpSocket* localIPTestSocket = new QTcpSocket;
+        _localSocketCheckSocket = localIPTestSocket;
 
-    // attempt to connect to our reliable host
-    localIPTestSocket->connectToHost(RELIABLE_LOCAL_IP_CHECK_HOST, RELIABLE_LOCAL_IP_CHECK_PORT);
+        connect(localIPTestSocket, &QTcpSocket::connected, this, &LimitedNodeList::connectedForLocalSocketTest);
+        connect(localIPTestSocket, &QTcpSocket::errorOccurred, this, &LimitedNodeList::errorTestingLocalSocket);
+
+        localIPTestSocket->connectToHost(QHostAddress(RELIABLE_LOCAL_IP_CHECK_HOSTS[_localSocketCheckHostIndex]),
+                                         RELIABLE_LOCAL_IP_CHECK_PORT);
+    } else {
+        // all candidates failed - fall back to the guessed local address
+        if (!_hasTCPCheckedLocalSocket) {
+            qCWarning(networking) << "Unable to reach any local-IP check host over TCP, falling back to guessed local address"
+                << getLocalSockAddr();
+        }
+        _localSocketCheckHostIndex = 0;
+        setLocalSocket(SockAddr { SocketType::UDP, getGuessedLocalAddress(), _nodeSocket.localPort(SocketType::UDP) });
+    }
 }
 
 void LimitedNodeList::connectedForLocalSocketTest() {
@@ -1010,7 +1054,13 @@ void LimitedNodeList::connectedForLocalSocketTest() {
             _hasTCPCheckedLocalSocket = true;
         }
 
+        if (_localSocketCheckSocket == localIPTestSocket) {
+            _localSocketCheckSocket.clear();
+        }
         localIPTestSocket->deleteLater();
+
+        // this update cycle is done
+        _localSocketCheckHostIndex = 0;
     }
 }
 
@@ -1018,16 +1068,14 @@ void LimitedNodeList::errorTestingLocalSocket() {
     auto localIPTestSocket = qobject_cast<QTcpSocket*>(sender());
 
     if (localIPTestSocket) {
-
-        // error connecting to the test socket - if we've never set our local socket using this test socket
-        // then use our possibly updated guessed local address as fallback
-        if (!_hasTCPCheckedLocalSocket) {
-            setLocalSocket(SockAddr { SocketType::UDP, getGuessedLocalAddress(), _nodeSocket.localPort(SocketType::UDP) });
-            qCCritical(networking) << "PAGE: Can't connect to Google DNS service via TCP, falling back to guessed local address"
-                << getLocalSockAddr();
+        if (_localSocketCheckSocket == localIPTestSocket) {
+            _localSocketCheckSocket.clear();
         }
-
         localIPTestSocket->deleteLater();
+
+        // move on to the next candidate
+        ++_localSocketCheckHostIndex;
+        attemptLocalSocketCheckForward();
     }
 }
 

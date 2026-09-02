@@ -30,6 +30,7 @@
 #include <QtCore/QSet>
 #include <QtCore/QSharedPointer>
 #include <QtNetwork/QUdpSocket>
+#include <QtNetwork/QTcpSocket>
 #include <QtNetwork/QHostAddress>
 
 #include <TBBHelpers.h>
@@ -341,6 +342,7 @@ public slots:
     void removeSilentNodes();
 
     void updateLocalSocket();
+    void attemptLocalSocketCheckForward();
 
     bool killNodeWithUUID(const QUuid& nodeUUID, ConnectionID newConnectionID = NULL_CONNECTION_ID);
     void noteAwakening() { _connectReason = Awake; }
@@ -424,6 +426,8 @@ protected:
     SockAddr _publicSockAddr;
     bool _hasTCPCheckedLocalSocket { false };
     bool _useAuthentication { true };
+    QPointer<QTcpSocket> _localSocketCheckSocket;
+    int _localSocketCheckHostIndex = 0;
 
     PacketReceiver* _packetReceiver;
 
