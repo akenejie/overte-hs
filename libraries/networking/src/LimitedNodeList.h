@@ -56,9 +56,6 @@ static const size_t DEFAULT_MAX_CONNECTION_RATE { std::numeric_limits<size_t>::m
 
 const char DEFAULT_ASSIGNMENT_SERVER_HOSTNAME[] = "localhost";
 
-const char STUN_SERVER_HOSTNAME[] = "stun1.l.google.com";
-const unsigned short STUN_SERVER_PORT = NetworkingConstants::STUN_SERVER_DEFAULT_PORT;
-
 const QHostAddress DEFAULT_ASSIGNMENT_CLIENT_MONITOR_HOSTNAME = QHostAddress::LocalHost;
 
 const QString USERNAME_UUID_REPLACEMENT_STATS_KEY = "$username";
@@ -86,8 +83,6 @@ public:
     enum ConnectionStep {
         LookupAddress = 1,
         HandleAddress,
-        SendSTUNRequest,
-        SetPublicSocketFromSTUN,
         SetICEServerHostname,
         SetICEServerSocket,
         SendICEServerQuery,
@@ -178,12 +173,8 @@ public:
                                       bool isUpstream = false, const QUuid& connectionSecret = QUuid(),
                                       const NodePermissions& permissions = DEFAULT_AGENT_PERMISSIONS);
 
-    static bool parseSTUNResponse(udt::BasePacket* packet, QHostAddress& newPublicAddress, uint16_t& newPublicPort);
-    bool hasCompletedInitialSTUN() const { return _hasCompletedInitialSTUN; }
-
     const SockAddr& getLocalSockAddr() const { return _localSockAddr; }
     const SockAddr& getPublicSockAddr() const { return _publicSockAddr; }
-    const SockAddr& getSTUNSockAddr() const { return _stunSockAddr; }
 
     void processKillNode(ReceivedMessage& message);
 
@@ -320,8 +311,6 @@ public:
     void setFlagTimeForConnectionStep(bool flag) { _flagTimeForConnectionStep = flag; }
     bool isFlagTimeForConnectionStep() { return _flagTimeForConnectionStep; }
 
-    static void makeSTUNRequestPacket(char* stunRequestPacket);
-
 #if (PR_BUILD || DEV_BUILD)
     void sendFakedHandshakeRequestToNode(SharedNodePointer node);
 #endif
@@ -352,9 +341,6 @@ public slots:
     void removeSilentNodes();
 
     void updateLocalSocket();
-
-    void startSTUNPublicSocketUpdate();
-    virtual void sendSTUNRequest();
 
     bool killNodeWithUUID(const QUuid& nodeUUID, ConnectionID newConnectionID = NULL_CONNECTION_ID);
     void noteAwakening() { _connectReason = Awake; }
@@ -417,11 +403,8 @@ protected:
     void setLocalSocket(const SockAddr& sockAddr);
 
     bool packetSourceAndHashMatchAndTrackBandwidth(const udt::Packet& packet, Node* sourceNode = nullptr);
-    void processSTUNResponse(std::unique_ptr<udt::BasePacket> packet);
 
     void handleNodeKill(const SharedNodePointer& node, ConnectionID newConnectionID = NULL_CONNECTION_ID);
-
-    void stopInitialSTUNUpdate(bool success);
 
     void sendPacketToIceServer(PacketType packetType, const SockAddr& iceServerSockAddr, const QUuid& clientID,
                                const QUuid& peerRequestID = QUuid());
@@ -439,7 +422,6 @@ protected:
     QUdpSocket* _dtlsSocket { nullptr };
     SockAddr _localSockAddr;
     SockAddr _publicSockAddr;
-    SockAddr _stunSockAddr { SocketType::UDP, STUN_SERVER_HOSTNAME, STUN_SERVER_PORT };
     bool _hasTCPCheckedLocalSocket { false };
     bool _useAuthentication { true };
 
@@ -447,11 +429,6 @@ protected:
 
     NodePermissions _permissions;
 
-    QPointer<QTimer> _initialSTUNTimer;
-
-    int _numInitialSTUNRequests = 0;
-    bool _hasCompletedInitialSTUN = false;
-    quint64 _firstSTUNTime = 0;
     quint64 _publicSocketUpdateTime = 0;
 
     mutable QReadWriteLock _connectionTimeLock { };
@@ -475,9 +452,6 @@ protected:
 
 private slots:
     void flagTimeForConnectionStep(ConnectionStep connectionStep, quint64 timestamp);
-    void STUNAddressLookupTimeout();
-    void STUNAddressLookupFailed();
-    void addSTUNHandlerToUnfiltered(); // called once STUN socket known
 
 private:
     void fillPacketHeader(const NLPacket& packet, HMACAuth* hmacAuth = nullptr);

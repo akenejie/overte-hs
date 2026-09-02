@@ -638,11 +638,6 @@ void DomainServer::setupAutomaticNetworking() {
                 // send any public socket changes to the data server so nodes can find us at our new IP
                 connect(nodeList.data(), &LimitedNodeList::publicSockAddrChanged, this,
                         &DomainServer::performIPAddressPortUpdate);
-
-                if (_automaticNetworkingSetting == IP_ONLY_AUTOMATIC_NETWORKING_VALUE) {
-                    // have the LNL enable public socket updating via STUN
-                    nodeList->startSTUNPublicSocketUpdate();
-                }
             } else {
                 qCCritical(domain_server) << "PAGE: Cannot enable domain-server automatic networking without a domain ID."
                 << "Please add an ID to your config file or via the web interface.";
@@ -677,9 +672,6 @@ void DomainServer::setupICEHeartbeatForFullNetworking() {
             this, &DomainServer::sendHeartbeatToIceServer);
     connect(limitedNodeList.data(), &LimitedNodeList::publicSockAddrChanged,
             this, &DomainServer::sendHeartbeatToIceServer);
-
-    // we need this DS to know what our public IP is - start trying to figure that out now
-    limitedNodeList->startSTUNPublicSocketUpdate();
 
     // to send ICE heartbeats we'd better have a private key locally with an uploaded public key
     // if we have an access token and we don't have a private key or the current domain ID has changed

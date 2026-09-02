@@ -120,14 +120,6 @@ LimitedNodeList::LimitedNodeList(int socketListenPort, int dtlsListenPort) :
 
     // handle when a socket connection has its receiver side reset - might need to emit clientConnectionToNodeReset
     connect(&_nodeSocket, &udt::Socket::clientHandshakeRequestComplete, this, &LimitedNodeList::clientConnectionToSockAddrReset);
-
-    if (_stunSockAddr.getAddress().isNull()) {
-        // we don't know the stun server socket yet, add it to unfiltered once known
-        connect(&_stunSockAddr, &SockAddr::lookupCompleted, this, &LimitedNodeList::addSTUNHandlerToUnfiltered);
-    } else {
-        // we know the stun server socket, add it to unfiltered now
-        addSTUNHandlerToUnfiltered();
-    }
 }
 
 QUuid LimitedNodeList::getSessionUUID() const {
@@ -988,246 +980,6 @@ void LimitedNodeList::sampleConnectionStats() {
     }
 }
 
-const uint32_t RFC_5389_MAGIC_COOKIE = 0x2112A442;
-const int NUM_BYTES_STUN_HEADER = 20;
-
-void LimitedNodeList::makeSTUNRequestPacket(char* stunRequestPacket) {
-    int packetIndex = 0;
-
-    const uint32_t RFC_5389_MAGIC_COOKIE_NETWORK_ORDER = htonl(RFC_5389_MAGIC_COOKIE);
-
-    // leading zeros + message type
-    const uint16_t REQUEST_MESSAGE_TYPE = htons(0x0001);
-    memcpy(stunRequestPacket + packetIndex, &REQUEST_MESSAGE_TYPE, sizeof(REQUEST_MESSAGE_TYPE));
-    packetIndex += sizeof(REQUEST_MESSAGE_TYPE);
-
-    // message length (no additional attributes are included)
-    uint16_t messageLength = 0;
-    memcpy(stunRequestPacket + packetIndex, &messageLength, sizeof(messageLength));
-    packetIndex += sizeof(messageLength);
-
-    memcpy(stunRequestPacket + packetIndex, &RFC_5389_MAGIC_COOKIE_NETWORK_ORDER, sizeof(RFC_5389_MAGIC_COOKIE_NETWORK_ORDER));
-    packetIndex += sizeof(RFC_5389_MAGIC_COOKIE_NETWORK_ORDER);
-
-    // transaction ID (random 12-byte unsigned integer)
-    const uint NUM_TRANSACTION_ID_BYTES = 12;
-    QUuid randomUUID = QUuid::createUuid();
-    memcpy(stunRequestPacket + packetIndex, randomUUID.toRfc4122().data(), NUM_TRANSACTION_ID_BYTES);
-}
-
-void LimitedNodeList::sendSTUNRequest() {
-    if (!_stunSockAddr.getAddress().isNull()) {
-        const int NUM_INITIAL_STUN_REQUESTS_BEFORE_FAIL = 10;
-
-        if (!_hasCompletedInitialSTUN) {
-            qCDebug(networking) << "Sending initial stun request to" << STUN_SERVER_HOSTNAME;
-
-            if (_numInitialSTUNRequests > NUM_INITIAL_STUN_REQUESTS_BEFORE_FAIL) {
-                // we're still trying to do our initial STUN we're over the fail threshold
-                stopInitialSTUNUpdate(false);
-            }
-
-            ++_numInitialSTUNRequests;
-        }
-
-        char stunRequestPacket[NUM_BYTES_STUN_HEADER];
-        makeSTUNRequestPacket(stunRequestPacket);
-        flagTimeForConnectionStep(ConnectionStep::SendSTUNRequest);
-        _nodeSocket.writeDatagram(stunRequestPacket, sizeof(stunRequestPacket), _stunSockAddr);
-    }
-}
-
-bool LimitedNodeList::parseSTUNResponse(udt::BasePacket* packet,
-                                        QHostAddress& newPublicAddress, uint16_t& newPublicPort) {
-    // check the cookie to make sure this is actually a STUN response
-    // and read the first attribute and make sure it is a XOR_MAPPED_ADDRESS
-    const int NUM_BYTES_MESSAGE_TYPE_AND_LENGTH = 4;
-    const uint16_t XOR_MAPPED_ADDRESS_TYPE = htons(0x0020);
-
-    const uint32_t RFC_5389_MAGIC_COOKIE_NETWORK_ORDER = htonl(RFC_5389_MAGIC_COOKIE);
-
-    int attributeStartIndex = NUM_BYTES_STUN_HEADER;
-
-    if (memcmp(packet->getData() + NUM_BYTES_MESSAGE_TYPE_AND_LENGTH,
-               &RFC_5389_MAGIC_COOKIE_NETWORK_ORDER,
-               sizeof(RFC_5389_MAGIC_COOKIE_NETWORK_ORDER)) != 0) {
-        return false;
-    }
-
-    // enumerate the attributes to find XOR_MAPPED_ADDRESS_TYPE
-    while (attributeStartIndex < packet->getDataSize()) {
-        if (memcmp(packet->getData() + attributeStartIndex, &XOR_MAPPED_ADDRESS_TYPE, sizeof(XOR_MAPPED_ADDRESS_TYPE)) == 0) {
-            const int NUM_BYTES_STUN_ATTR_TYPE_AND_LENGTH = 4;
-            const int NUM_BYTES_FAMILY_ALIGN = 1;
-            const uint8_t IPV4_FAMILY_NETWORK_ORDER = htons(0x01) >> 8;
-
-            int byteIndex = attributeStartIndex + NUM_BYTES_STUN_ATTR_TYPE_AND_LENGTH + NUM_BYTES_FAMILY_ALIGN;
-
-            uint8_t addressFamily = 0;
-            memcpy(&addressFamily, packet->getData() + byteIndex, sizeof(addressFamily));
-
-            byteIndex += sizeof(addressFamily);
-
-            if (addressFamily == IPV4_FAMILY_NETWORK_ORDER) {
-                // grab the X-Port
-                uint16_t xorMappedPort = 0;
-                memcpy(&xorMappedPort, packet->getData() + byteIndex, sizeof(xorMappedPort));
-
-                newPublicPort = ntohs(xorMappedPort) ^ (ntohl(RFC_5389_MAGIC_COOKIE_NETWORK_ORDER) >> 16);
-
-                byteIndex += sizeof(xorMappedPort);
-
-                // grab the X-Address
-                uint32_t xorMappedAddress = 0;
-                memcpy(&xorMappedAddress, packet->getData() + byteIndex, sizeof(xorMappedAddress));
-
-                uint32_t stunAddress = ntohl(xorMappedAddress) ^ ntohl(RFC_5389_MAGIC_COOKIE_NETWORK_ORDER);
-
-                // QHostAddress newPublicAddress(stunAddress);
-                newPublicAddress = QHostAddress(stunAddress);
-                return true;
-            }
-        } else {
-            // push forward attributeStartIndex by the length of this attribute
-            const int NUM_BYTES_ATTRIBUTE_TYPE = 2;
-
-            uint16_t attributeLength = 0;
-            memcpy(&attributeLength, packet->getData() + attributeStartIndex + NUM_BYTES_ATTRIBUTE_TYPE,
-                   sizeof(attributeLength));
-            attributeLength = ntohs(attributeLength);
-
-            attributeStartIndex += NUM_BYTES_MESSAGE_TYPE_AND_LENGTH + attributeLength;
-        }
-    }
-    return false;
-}
-
-
-void LimitedNodeList::processSTUNResponse(std::unique_ptr<udt::BasePacket> packet) {
-    uint16_t newPublicPort;
-    QHostAddress newPublicAddress;
-    if (parseSTUNResponse(packet.get(), newPublicAddress, newPublicPort)) {
-
-        if (newPublicAddress != _publicSockAddr.getAddress() || newPublicPort != _publicSockAddr.getPort()) {
-            qCDebug(networking, "New public socket received from STUN server is %s:%hu (was %s:%hu)",
-                    newPublicAddress.toString().toStdString().c_str(),
-                    newPublicPort,
-                    _publicSockAddr.getAddress().toString().toLocal8Bit().constData(),
-                    _publicSockAddr.getPort());
-
-            _publicSockAddr = SockAddr(SocketType::UDP, newPublicAddress, newPublicPort);
-
-            if (!_hasCompletedInitialSTUN) {
-                // if we're here we have definitely completed our initial STUN sequence
-                stopInitialSTUNUpdate(true);
-            }
-
-            emit publicSockAddrChanged(_publicSockAddr);
-
-            flagTimeForConnectionStep(ConnectionStep::SetPublicSocketFromSTUN);
-        }
-    }
-}
-
-void LimitedNodeList::startSTUNPublicSocketUpdate() {
-    if (!_initialSTUNTimer ) {
-        // setup our initial STUN timer here so we can quickly find out our public IP address
-        _initialSTUNTimer = new QTimer { this };
-
-        connect(_initialSTUNTimer.data(), &QTimer::timeout, this, &LimitedNodeList::sendSTUNRequest);
-
-        const int STUN_INITIAL_UPDATE_INTERVAL_MSECS = 250;
-        _initialSTUNTimer->setInterval(STUN_INITIAL_UPDATE_INTERVAL_MSECS); // 250ms, Qt::CoarseTimer acceptable
-
-        // if we don't know the STUN IP yet we need to wait until it is known to start STUN requests
-        if (_stunSockAddr.getAddress().isNull()) {
-
-            // if we fail to lookup the socket then timeout the STUN address lookup
-            connect(&_stunSockAddr, &SockAddr::lookupFailed, this, &LimitedNodeList::STUNAddressLookupFailed);
-
-            // immediately send a STUN request once we know the socket
-            connect(&_stunSockAddr, &SockAddr::lookupCompleted, this, &LimitedNodeList::sendSTUNRequest);
-
-            // start the initial STUN timer once we know the socket
-            connect(&_stunSockAddr, SIGNAL(lookupCompleted()), _initialSTUNTimer, SLOT(start()));
-
-            // in case we just completely fail to lookup the stun socket - add a 10s single shot that will trigger the fail case
-            const quint64 STUN_DNS_LOOKUP_TIMEOUT_MSECS = 10 * 1000;
-
-            QTimer* lookupTimeoutTimer = new QTimer { this };
-            lookupTimeoutTimer->setSingleShot(true);
-
-            connect(lookupTimeoutTimer, &QTimer::timeout, this, &LimitedNodeList::STUNAddressLookupTimeout);
-
-            // delete the lookup timeout timer once it has fired
-            connect(lookupTimeoutTimer, &QTimer::timeout, lookupTimeoutTimer, &QTimer::deleteLater);
-
-            lookupTimeoutTimer->start(STUN_DNS_LOOKUP_TIMEOUT_MSECS);
-        } else {
-            _initialSTUNTimer->start();
-
-            // send an initial STUN request right away
-            sendSTUNRequest();
-        }
-    }
-}
-
-void LimitedNodeList::STUNAddressLookupFailed() {
-    if (_stunSockAddr.getAddress().isNull()) {
-        // got a lookup failure
-        qCCritical(networking) << "PAGE: Failed to lookup address of STUN server" << STUN_SERVER_HOSTNAME;
-        stopInitialSTUNUpdate(false);
-    }
-}
-
-void LimitedNodeList::STUNAddressLookupTimeout() {
-    if (_stunSockAddr.getAddress().isNull()) {
-        // our stun address is still NULL, but we've been waiting for long enough - time to force a fail
-        qCCritical(networking) << "PAGE: Address lookup of STUN server" << STUN_SERVER_HOSTNAME << "timed out";
-        stopInitialSTUNUpdate(false);
-    }
-}
-
-void LimitedNodeList::addSTUNHandlerToUnfiltered() {
-    // make ourselves the handler of STUN packets when they come in
-    _nodeSocket.addUnfilteredHandler(_stunSockAddr, [this](std::unique_ptr<udt::BasePacket> packet) { processSTUNResponse(std::move(packet)); });
-}
-
-void LimitedNodeList::stopInitialSTUNUpdate(bool success) {
-    _hasCompletedInitialSTUN = true;
-
-    if (!success) {
-        // if we're here this was the last failed STUN request
-        // use our DS as our stun server
-        qCWarning(networking, "PAGE: Failed to lookup public address via STUN server at %s:%hu (likely a critical error for auto-networking).",
-                STUN_SERVER_HOSTNAME, STUN_SERVER_PORT);
-        qCDebug(networking) << "LimitedNodeList public socket will be set with local port and null QHostAddress.";
-
-        // reset the public address and port to a null address
-        _publicSockAddr = SockAddr(SocketType::UDP, QHostAddress(), _nodeSocket.localPort(SocketType::UDP));
-
-        // we have changed the publicSockAddr, so emit our signal
-        emit publicSockAddrChanged(_publicSockAddr);
-
-        flagTimeForConnectionStep(ConnectionStep::SetPublicSocketFromSTUN);
-    }
-
-    // stop our initial fast timer
-    if (_initialSTUNTimer) {
-        _initialSTUNTimer->stop();
-        _initialSTUNTimer->deleteLater();
-    }
-
-    // We now setup a timer here to fire every so often to check that our IP address has not changed.
-    // Or, if we failed - it will check if we can eventually get a public socket
-    const int STUN_IP_ADDRESS_CHECK_INTERVAL_MSECS = 10 * 1000;
-
-    QTimer* stunOccasionalTimer = new QTimer { this };
-    connect(stunOccasionalTimer, &QTimer::timeout, this, &LimitedNodeList::sendSTUNRequest);
-
-    stunOccasionalTimer->start(STUN_IP_ADDRESS_CHECK_INTERVAL_MSECS);
-}
-
 void LimitedNodeList::updateLocalSocket() {
     // when update is called, if the local socket is empty then start with the guessed local socket
     if (_localSockAddr.isNull()) {
@@ -1297,6 +1049,14 @@ void LimitedNodeList::setLocalSocket(const SockAddr& sockAddr) {
         }
 
         emit localSockAddrChanged(_localSockAddr);
+    }
+
+    // The reachable public socket of this machine is simply its own local socket, since
+    // public (NAT-mapped) socket discovery via STUN has been removed. Without this, a null
+    // public socket would cause the node to refuse to send its domain-server check-in, so it
+    // could never register with the domain server.
+    if (_publicSockAddr.getAddress() != sockAddr.getAddress()) {
+        _publicSockAddr = sockAddr;
     }
 }
 
