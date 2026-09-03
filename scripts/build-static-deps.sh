@@ -213,16 +213,25 @@ echo "==> running conan install (toolchain into $BUILD_DIR/generators)..."
 conan profile detect --force >/dev/null 2>&1 || true
 
 # Some recipes (e.g. opus/1.5.2, which we need to build *from source* on
-# 32-bit targets because there is no prebuilt x86 binary) declare a
-# `tool_requires("cmake/[...]")`. Conan then resolves the `cmake` package, but
-# conancenter ships no cmake binary for the x86/armv7 32-bit architectures, so
-# the resolved tool is "Invalid". The conan-recommended fix is to substitute the
-# system cmake (always installed in our containers) via a `[platform_tool_requires]`
-# profile section, which we provide as an extra (merged) profile below.
+# 32-bit targets because there is no prebuilt x86/armv7 binary) declare a
+# `tool_requires("cmake/[>=3.16 <5]")`. Conan then resolves the `cmake`
+# package, but conancenter ships no cmake binary for the x86/armv7 32-bit
+# architectures, so the resolved tool is "Invalid". The conan-recommended fix
+# is to substitute the system cmake (always installed in our containers). We
+# do that with two cooperating profile sections:
+#   - [replace_tool_requires] pins whatever cmake the recipes request into one
+#     known version (robust to which version conan would otherwise resolve).
+#   - [platform_tool_requires] then maps that exact version to the cmake that
+#     is already on the system PATH, so no conan cmake package is fetched at
+#     all. NOTE: platform_tool_requires requires an EXACT (strict) version
+#     match - a wildcard like `cmake/*` does NOT work.
+mkdir -p "$BUILD_DIR"
 PLATFORM_PROFILE="$BUILD_DIR/platform-tool-requires.ini"
 cat > "$PLATFORM_PROFILE" <<'EOF'
+[replace_tool_requires]
+cmake/*: cmake/3.25.2
 [platform_tool_requires]
-cmake/*
+cmake/3.25.2
 EOF
 PLATFORM_TOOL_ARGS=( -pr:h="$PLATFORM_PROFILE" -pr:b="$PLATFORM_PROFILE" )
 # QEMU-emulated containers (i386/armv7) may confuse conan's arch detection
