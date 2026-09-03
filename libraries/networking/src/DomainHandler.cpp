@@ -25,7 +25,6 @@
 
 #include "AddressManager.h"
 #include "Assignment.h"
-#include "DomainAccountManager.h"
 #include "SockAddr.h"
 #include "NodeList.h"
 #include "udt/Packet.h"
@@ -224,8 +223,6 @@ void DomainHandler::setURLAndID(QUrl domainURL, QUuid domainID) {
         QString previousHost = _domainURL.host();
         _domainURL = domainURL;
 
-        _hasCheckedForDomainAccessToken = false;
-
         if (previousHost != domainURL.host()) {
             qCDebug(networking) << "Updated domain hostname to" << domainURL.host();
 
@@ -242,8 +239,6 @@ void DomainHandler::setURLAndID(QUrl domainURL, QUuid domainID) {
                 UserActivityLogger::getInstance().changedDomain(domainURL.host());
             }
         }
-
-        DependencyManager::get<DomainAccountManager>()->setDomainURL(_domainURL);
 
         emit domainURLChanged(_domainURL);
 
@@ -617,31 +612,8 @@ void DomainHandler::processDomainServerConnectionDeniedPacket(QSharedPointer<Rec
             _connectionDenialsSinceKeypairRegen = 0;
         }
 
-        // Server with domain login will prompt for domain login, not directory server, so reset domain values if asked for directory server.
-        auto domainAccountManager = DependencyManager::get<DomainAccountManager>();
-        domainAccountManager->setAuthURL(QUrl());
-        domainAccountManager->setClientID(QString());
-
     } else if (reasonSuggestsDomainLogin(reasonCode)) {
         qCWarning(networking) << "Make sure you are logged in to the domain.";
-
-        auto domainAccountManager = DependencyManager::get<DomainAccountManager>();
-        if (!extraInfo.isEmpty()) {
-            auto extraInfoComponents = extraInfo.split("|");
-            domainAccountManager->setAuthURL(extraInfoComponents.value(0));
-            domainAccountManager->setClientID(extraInfoComponents.value(1));
-        } else {
-            // Shouldn't occur, but just in case.
-            domainAccountManager->setAuthURL(QUrl());
-            domainAccountManager->setClientID(QString());
-        }
-
-        if (!_hasCheckedForDomainAccessToken) {
-            domainAccountManager->checkAndSignalForAccessToken();
-            _hasCheckedForDomainAccessToken = true;
-        }
-
-        // ####### TODO: regenerate key-pair after several failed connection attempts, similar to Directory Services login code?
 
     }
 }

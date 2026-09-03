@@ -105,7 +105,7 @@ void PacketReceiver::registerVerifiedListener(PacketType type, const ListenerRef
     QMutexLocker locker(&_packetListenerLock);
 
     if (_messageListenerMap.contains(type)) {
-        qCWarning(networking) << "Registering a packet listener for packet type" << type
+        qCDebug(networking) << "Registering a packet listener for packet type" << type
             << "that will remove a previously registered listener";
     }
     

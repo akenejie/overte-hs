@@ -876,7 +876,9 @@ void ScriptManager::init() {
 
         scriptEngine->registerGlobalObject(sgp, "DebugDraw", &DebugDraw::getInstance());
 
-        scriptEngine->registerGlobalObject(sgp, "UserActivityLogger", DependencyManager::get<UserActivityLoggerScriptingInterface>().data());
+        if (DependencyManager::isSet<UserActivityLoggerScriptingInterface>()) {
+            scriptEngine->registerGlobalObject(sgp, "UserActivityLogger", DependencyManager::get<UserActivityLoggerScriptingInterface>().data());
+        }
     }
 
 #if DEV_BUILD || PR_BUILD

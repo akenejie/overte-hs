@@ -64,6 +64,12 @@ LimitedNodeList::LimitedNodeList(int socketListenPort, int dtlsListenPort) :
     }
     qCDebug(networking) << "NodeList UDP socket is listening on" << assignedPort;
 
+    // NOTE: WebRTC sockets are intentionally not bound here. WebRTC data channels
+    // are not compiled into headless builds (WEBRTC_DATA_CHANNELS undefined), so an
+    // unconditional bind() would hit the "not recognized" default branch and emit a
+    // spurious CRITICAL. When WebRTC is built, the WebRTC socket is managed via its
+    // own connection/signalling path.
+
     if (dtlsListenPort != INVALID_PORT) {
         // only create the DTLS socket during constructor if a custom port is passed
         _dtlsSocket = new QUdpSocket(this);
@@ -74,8 +80,6 @@ LimitedNodeList::LimitedNodeList(int socketListenPort, int dtlsListenPort) :
         }
         qCDebug(networking) << "NodeList DTLS socket is listening on" << _dtlsSocket->localPort();
     }
-
-    _nodeSocket.bind(SocketType::WebRTC, QHostAddress::AnyIPv4);
 
     // check for local socket updates every so often
     const int LOCAL_SOCKET_UPDATE_INTERVAL_MSECS = 5 * 1000;

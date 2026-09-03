@@ -320,7 +320,6 @@ private:
 
     QSet<QString> _domainConnectionRefusals;
     bool _hasCheckedForAccessToken { false };
-    bool _hasCheckedForDomainAccessToken { false };
     int _connectionDenialsSinceKeypairRegen { 0 };
     int _checkInPacketsSinceLastReply { 0 };
 

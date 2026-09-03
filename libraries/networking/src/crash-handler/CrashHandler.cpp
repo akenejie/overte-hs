@@ -65,7 +65,7 @@ bool CrashHandler::start() {
         qCDebug(crash_handler) << "Forwarded" << countAdded << "annotations";
 
     } else {
-        qCWarning(crash_handler) << "Crash handler failed to start";
+        qCDebug(crash_handler) << "Crash handler failed to start";
     }
 
     return started;

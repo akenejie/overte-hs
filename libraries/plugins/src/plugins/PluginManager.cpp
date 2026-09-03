@@ -174,7 +174,7 @@ int PluginManager::instantiate() {
                 pluginInfo.push_back(info);
             }
         } else {
-            qWarning() << "pluginPath does not exit..." << pluginDir;
+            qCDebug(plugins) << "pluginPath does not exist..." << pluginDir;
         }
     });
     return loadedPlugins;

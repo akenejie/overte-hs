@@ -77,7 +77,10 @@ namespace Setting {
             // in an assignment-client - the QSettings backing we use for this means persistence of these
             // settings from an AC (when there can be multiple terminating at same time on one machine)
             // is currently not supported
-            qCWarning(settings_interface) << "Setting::Interface::init() for key" << _key << "- Manager not yet created." <<
+            //
+            // This is an expected, informational condition for assignment-clients and headless servers
+            // (which do not persist settings) rather than an error, so it is logged at Debug level.
+            qCDebug(settings_interface) << "Setting::Interface::init() for key" << _key << "- Manager not yet created." <<
                 "Settings persistence disabled.";
         } else {
             _manager = DependencyManager::get<Manager>();

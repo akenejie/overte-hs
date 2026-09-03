@@ -2757,7 +2757,7 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
         return false;
     }
 
-    qWarning() << "EntityTree::readFromMap: loading" << entitiesQList.length() << "entities from map";
+    qCDebug(entities) << "EntityTree::readFromMap: loading" << entitiesQList.length() << "entities from map";
 
     QMap<QUuid, QVector<QUuid>> cloneIDs;
 
@@ -2789,7 +2789,7 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
             entityItemID = EntityItemID(QUuid::createUuid());
         }
 
-        qWarning() << "EntityTree::readFromMap: entity" << entityItemID << "type:" << properties.getType()
+        qCDebug(entities) << "EntityTree::readFromMap: entity" << entityItemID << "type:" << properties.getType()
                    << "pos:" << properties.getPosition() << "dims:" << properties.getDimensions()
                    << "mapKeys:" << entityMap.keys();
 
@@ -2918,7 +2918,7 @@ bool EntityTree::readFromMap(QVariantMap& map, const bool isImport) {
             qWarning() << "adding Entity FAILED:" << entityItemID << "type:" << properties.getType();
             success = false;
         } else {
-            qWarning() << "adding Entity OK:" << entityItemID << "type:" << properties.getType();
+            qCDebug(entities) << "adding Entity OK:" << entityItemID << "type:" << properties.getType();
         }
 
         if (entity) {

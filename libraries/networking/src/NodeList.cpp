@@ -34,7 +34,6 @@
 #include "AddressManager.h"
 #include "Assignment.h"
 #include "AudioHelpers.h"
-#include "DomainAccountManager.h"
 #include "SockAddr.h"
 #include "FingerprintUtils.h"
 
@@ -111,13 +110,6 @@ NodeList::NodeList(char newOwnerType, int socketListenPort, int dtlsListenPort) 
 
     // clear our NodeList when logout is requested
     connect(accountManager.data(), &AccountManager::logoutComplete , this, [this]{ reset("Logged out"); });
-
-    // Only used in Interface.
-    auto domainAccountManager = DependencyManager::get<DomainAccountManager>();
-    if (domainAccountManager) {
-        _hasDomainAccountManager = true;
-        connect(domainAccountManager.data(), &DomainAccountManager::newTokens, this, &NodeList::sendDomainServerCheckIn);
-    }
 
     // anytime we get a new node we will want to attempt to punch to it
     connect(this, &LimitedNodeList::nodeAdded, this, &NodeList::startNodeHolePunch);
@@ -497,15 +489,6 @@ void NodeList::sendDomainServerCheckIn() {
                 packetStream << usernameSignature;
             } else {
                 packetStream << QString("");  // Placeholder in case have domain username.
-            }
-
-            // Domain account.
-            if (_hasDomainAccountManager) {
-                auto domainAccountManager = DependencyManager::get<DomainAccountManager>();
-                if (!domainAccountManager->getUsername().isEmpty() && !domainAccountManager->getAccessToken().isEmpty()) {
-                    packetStream << domainAccountManager->getUsername();
-                    packetStream << (domainAccountManager->getAccessToken() + ":" + domainAccountManager->getRefreshToken());
-                }
             }
 
         }

@@ -21,7 +21,7 @@
 Q_LOGGING_CATEGORY(crash_handler, "overte.crash_handler")
 
 bool startCrashHandler(std::string appPath, std::string crashURL, std::string crashToken) {
-    qCWarning(crash_handler) << "No crash handler available.";
+    qCDebug(crash_handler) << "No crash handler available.";
     return false;
 }
 
