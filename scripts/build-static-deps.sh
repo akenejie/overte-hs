@@ -211,6 +211,20 @@ fi
 # --- 3. Conan toolchain -----------------------------------------------------
 echo "==> running conan install (toolchain into $BUILD_DIR/generators)..."
 conan profile detect --force >/dev/null 2>&1 || true
+
+# Some recipes (e.g. opus/1.5.2, which we need to build *from source* on
+# 32-bit targets because there is no prebuilt x86 binary) declare a
+# `tool_requires("cmake/[...]")`. Conan then resolves the `cmake` package, but
+# conancenter ships no cmake binary for the x86/armv7 32-bit architectures, so
+# the resolved tool is "Invalid". The conan-recommended fix is to substitute the
+# system cmake (always installed in our containers) via a `[platform_tool_requires]`
+# profile section, which we provide as an extra (merged) profile below.
+PLATFORM_PROFILE="$BUILD_DIR/platform-tool-requires.ini"
+cat > "$PLATFORM_PROFILE" <<'EOF'
+[platform_tool_requires]
+cmake/*
+EOF
+PLATFORM_TOOL_ARGS=( -pr:h="$PLATFORM_PROFILE" -pr:b="$PLATFORM_PROFILE" )
 # QEMU-emulated containers (i386/armv7) may confuse conan's arch detection
 # (it can see the host's x86_64/aarch64), which would bake the wrong -m flag
 # into the toolchain. When CONAN_ARCH is set (per CI matrix), override it on
@@ -219,6 +233,7 @@ if [ -n "${CONAN_ARCH:-}" ]; then
     echo "==> overriding conan arch to $CONAN_ARCH"
     CONAN_PROFILE_ARGS+=( -s:a "arch=${CONAN_ARCH}" )
 fi
+CONAN_PROFILE_ARGS+=( "${PLATFORM_TOOL_ARGS[@]}" )
 ( cd "$PROJECT_ROOT" && conan install . "${CONAN_PROFILE_ARGS[@]}" --build=missing --output-folder="$BUILD_DIR" )
 
 # --- 4. CMake configure -----------------------------------------------------
