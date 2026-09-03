@@ -261,7 +261,12 @@ EOF
     NEON_PROFILE_ARGS=( -pr:a="$NEON_PROFILE" )
     echo "==> armv7: enabling NEON/FPU flags via $NEON_PROFILE"
 fi
-CONAN_PROFILE_ARGS+=( "${PLATFORM_TOOL_ARGS[@]}" "${NEON_PROFILE_ARGS[@]}" )
+CONAN_PROFILE_ARGS+=( "${PLATFORM_TOOL_ARGS[@]}" )
+if [ "${#NEON_PROFILE_ARGS[@]}" -gt 0 ]; then
+    # macOS ships bash 3.2, where expanding an empty array under `set -u`
+    # errors with "unbound variable"; guard the optional NEON profile args.
+    CONAN_PROFILE_ARGS+=( "${NEON_PROFILE_ARGS[@]}" )
+fi
 ( cd "$PROJECT_ROOT" && conan install . "${CONAN_PROFILE_ARGS[@]}" --build=missing --output-folder="$BUILD_DIR" )
 
 # --- 4. CMake configure -----------------------------------------------------
