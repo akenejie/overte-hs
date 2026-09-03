@@ -66,6 +66,10 @@ class Overte(ConanFile):
             # and provided via CMAKE_PREFIX_PATH; see the static build docs.
             self.requires("bullet3/3.25")
             self.requires("openssl/3.5.7", force=True)
+            # Opus is required even in the headless build: the overte-server
+            # embeds the audio codec statically (there is no runtime .so plugin
+            # directory), so the audio/agent applets can negotiate Opus.
+            self.requires("opus/1.5.2")
             return
 
         self.requires("onetbb/2021.10.0")

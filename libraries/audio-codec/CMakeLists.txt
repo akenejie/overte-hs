@@ -14,17 +14,17 @@ setup_hifi_library()
 
 link_hifi_libraries(shared plugins audio)
 
-# Link the system Opus codec library. Upstream's TARGET_opus() macro bails out
-# when OVERTE_HEADLESS is set (that is why the stock single-binary build ships
-# with no audio codec at all); here the codec is required, so link it directly.
-find_package(PkgConfig QUIET)
-if (PkgConfig_FOUND)
-  pkg_check_modules(HIFI_OPUS QUIET opus)
-endif()
-if (HIFI_OPUS_FOUND)
-  target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${HIFI_OPUS_INCLUDE_DIRS})
-  target_link_libraries(${TARGET_NAME} ${HIFI_OPUS_LINK_LIBRARIES})
+# Link Opus. Upstream's TARGET_opus() macro returns early when OVERTE_HEADLESS
+# is set (that is why the stock single-binary build ships with no audio codec
+# at all); here the codec is required, so link Opus unconditionally. With conan
+# (OVERTE_USE_SYSTEM_LIBS=OFF) this resolves to the static Opus::opus target,
+# keeping the deliverable a self-contained binary (no runtime libopus needed).
+if (OVERTE_USE_SYSTEM_LIBS)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(Opus REQUIRED opus)
+  target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${Opus_INCLUDE_DIRS})
+  target_link_libraries(${TARGET_NAME} ${Opus_LINK_LIBRARIES})
 else()
-  target_include_directories(${TARGET_NAME} SYSTEM PRIVATE /usr/include)
-  target_link_libraries(${TARGET_NAME} opus)
+  find_package(Opus QUIET REQUIRED)
+  target_link_libraries(${TARGET_NAME} Opus::opus)
 endif()
