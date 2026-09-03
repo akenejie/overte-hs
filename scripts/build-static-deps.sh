@@ -242,7 +242,26 @@ if [ -n "${CONAN_ARCH:-}" ]; then
     echo "==> overriding conan arch to $CONAN_ARCH"
     CONAN_PROFILE_ARGS+=( -s:a "arch=${CONAN_ARCH}" )
 fi
-CONAN_PROFILE_ARGS+=( "${PLATFORM_TOOL_ARGS[@]}" )
+# QEMU armv7 (CONAN_ARCH=armv7) builds opus/1.5.2 from source. Opus's CMake
+# auto-detects arm_neon.h and compiles its NEON intrinsics, but conan's generic
+# armv7 flags (plain -march=armv7) carry no FPU/float-ABI options, so GCC fails
+# to inline the always_inline NEON builtins ("target specific option mismatch").
+# Baking -mfpu=neon-vfpv4 -mfloat-abi=hard via [conf] into the conan toolchain
+# (tools.build:cflags/cxxflags -> conan_toolchain.cmake) fixes that and is
+# applied consistently to every conan-built package, avoiding ABI mismatches.
+NEON_PROFILE_ARGS=()
+if [ "${CONAN_ARCH:-}" = "armv7" ]; then
+    NEON_PROFILE="$BUILD_DIR/neon.ini"
+    cat > "$NEON_PROFILE" <<'EOF'
+[conf]
+tools.build:cflags=["-mfloat-abi=hard", "-mfpu=neon-vfpv4"]
+tools.build:cxxflags=["-mfloat-abi=hard", "-mfpu=neon-vfpv4"]
+EOF
+    # -pr:a applies these flags to both the host and build profiles.
+    NEON_PROFILE_ARGS=( -pr:a="$NEON_PROFILE" )
+    echo "==> armv7: enabling NEON/FPU flags via $NEON_PROFILE"
+fi
+CONAN_PROFILE_ARGS+=( "${PLATFORM_TOOL_ARGS[@]}" "${NEON_PROFILE_ARGS[@]}" )
 ( cd "$PROJECT_ROOT" && conan install . "${CONAN_PROFILE_ARGS[@]}" --build=missing --output-folder="$BUILD_DIR" )
 
 # --- 4. CMake configure -----------------------------------------------------
