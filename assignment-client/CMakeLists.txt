@@ -18,7 +18,7 @@ setup_thread_debugger()
 link_hifi_libraries(
   networking shared physics octree avatars entities
   audio animation recording
-  plugins
+  audio-codec plugins
   script-engine
   image
   graphics

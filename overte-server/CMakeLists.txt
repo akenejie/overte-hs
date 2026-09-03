@@ -57,7 +57,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 # union of the hifi libraries linked by both applets
 link_hifi_libraries(
   networking shared physics octree avatars entities
-  audio animation recording plugins script-engine image graphics
+  audio animation recording audio-codec plugins script-engine image graphics
   model-networking model-serializers gpu ktx shaders render material-networking procedural
   hfm model-baker workload task
 )

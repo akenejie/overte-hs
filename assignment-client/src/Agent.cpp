@@ -53,6 +53,7 @@
 
 #include <plugins/CodecPlugin.h>
 #include <plugins/PluginManager.h>
+#include <OpusCodec.h>
 
 #ifndef OVERTE_NO_QTWEBSOCKET
 #include <WebSocketServerClass.h>
@@ -91,7 +92,11 @@ Agent::Agent(ReceivedMessage& message) :
     DependencyManager::get<EntityScriptingInterface>()->setPacketSender(&_entityEditSender);
 
     DependencyManager::set<ResourceManager>();
-    DependencyManager::set<PluginManager>()->instantiate();
+    auto pluginManager = DependencyManager::set<PluginManager>();
+    pluginManager->instantiate();
+    // Statically register the embedded Opus codec (single-binary build; no
+    // runtime .so plugin directory), before negotiateCodec() locks it in.
+    pluginManager->setCodecPluginProvider(opusCodecPlugins);
 
     DependencyManager::registerInheritance<SpatialParentFinder, AssignmentParentFinder>();
 

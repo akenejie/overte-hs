@@ -26,6 +26,7 @@
 #include <OctreeConstants.h>
 #include <plugins/PluginManager.h>
 #include <plugins/CodecPlugin.h>
+#include <OpusCodec.h>
 #include <udt/PacketHeaders.h>
 #include <SharedUtil.h>
 #include <StDev.h>
@@ -81,6 +82,10 @@ AudioMixer::AudioMixer(ReceivedMessage& message) :
         return nameValue.toString().contains("codec", Qt::CaseInsensitive);
     };
     pluginManager->setPluginFilter(codecPluginFilter);
+
+    // Statically register the embedded Opus codec (single-binary build; no
+    // runtime .so plugin directory), before getCodecPlugins() locks it in.
+    pluginManager->setCodecPluginProvider(opusCodecPlugins);
 
     const auto& codecPlugins = pluginManager->getCodecPlugins();
     for(const auto& codec : codecPlugins) {
