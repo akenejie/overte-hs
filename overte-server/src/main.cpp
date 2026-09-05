@@ -80,10 +80,10 @@ void printUsage(const char* prog) {
         "%s -h | --help\n"
         "%s --version\n"
         "\n"
-        "Run any combination of the Overte servers in one process group. Each --* <port>\n"
+"Run any combination of the Overte servers in one process group. Each --* <port>\n"
         "flag starts that server on the given UDP port:\n"
-        "  --domain <port>        the domain-server (your room). Also makes the other servers\n"
-        "                         register to it at localhost:<port>.\n"
+        "  --domain <port>        the domain-server (your room). The other servers in this\n"
+        "                         invocation check in with it at localhost:<port>.\n"
         "  --audio  <port>        the audio mixer (voice)\n"
         "  --avatar <port>        the avatar mixer\n"
         "  --entity <port>        the entity server (world content)\n"
@@ -91,10 +91,10 @@ void printUsage(const char* prog) {
         "  --assets <port>        the asset server (models, textures, scripts)\n"
         "  --messages <port>      the messages mixer (text chat and script messages)\n"
         "\n"
-        "Without --domain the other servers register to an existing domain instead:\n"
-        "  --host <host[:port]>  domain address for them. The host defaults to localhost and\n"
-        "                        the port to the --domain port; when --domain is absent the\n"
-        "                        port must be given (use the host:port form).\n"
+        "--domain and --host are mutually exclusive. Without --domain the other servers join\n"
+        "an existing domain instead of starting one:\n"
+        "  --host <host:port>     address of the domain they check in with (the port is\n"
+        "                         required, use the host:port form).\n"
         "\n"
         "All server state lives in a 'data' directory in the current directory by default (override with --data): config.json, entities/ and assets/ are kept there, and any transient cache is removed when the server shuts down. Each file belongs to one server - config.json to the domain-server, entities/ to the domain/entity servers, assets/ to the asset-server - so copying the folders a server owns to another\n machine stands that server up there. Nothing is written to the home directory, /run or /tmp, and no port is stored in any config file.\n"
         "\n"
@@ -102,9 +102,8 @@ void printUsage(const char* prog) {
         "%s --domain 40102 # room only\n"
         "%s --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --assets 40106 # full stack\n"
         "%s --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --entity-script 40107 --assets 40106 --messages 40108 # full stack + chat/scripts\n"
-        "%s --host 192.168.1.5:40102 --entity 40105 --assets 40106 # entity+asset servers with remote domain server\n"
-        "%s --domain 40102 --host 192.168.1.5 # register mixers to another host\n",
-        prog, prog, prog, prog, prog, prog, prog, prog);
+        "%s --entity 40105 --assets 40106 --host 192.168.1.5:40102 # entity+asset servers with an existing domain\n",
+        prog, prog, prog, prog, prog, prog, prog);
 }
 
 std::string getDataDir() {

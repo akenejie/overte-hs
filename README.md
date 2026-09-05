@@ -67,7 +67,7 @@ For example, copy only a specific data folder (here `assets/`) to another machin
 overte-hs --host 192.168.1.5:40102 --assets 40106
 ```
 
-This enables distributed configurations such as "the origin Domain server lives on `192.168.1.5:40102`, but only the room's assets function is being processed (hosted) here on this machine right now".
+This enables distributed configurations such as "the origin Domain server lives on `192.168.1.5:40102`, but only the room's assets function is being processed (hosted) here on this machine right now". (`--host` and `--domain` are mutually exclusive.)
 
 ## Eliminating environmental dependency
 In upstream Overte, "one room per machine" is apparently the principle: when the server starts, it writes `HIFI_DOMAIN_SERVER_PORT` into the machine's environment variables. Overte HS does not write environment variables, because hosting different rooms on the same machine using different ports would interfere with each other. When hosting multiple spaces on a single machine, do it like this:
@@ -162,7 +162,7 @@ set HIFI_DOMAIN_SERVER_PORT=50102 & "C:\Prpgram Files\Overte\interface.exe"
 overte-hs --host 192.168.1.5:40102 --assets 40106
 ```
 
-これにより、「大元のDomainサーバーは `192.168.1.5:40102` に存在しているが、その部屋のAssets機能だけは今このマシンで処理（ホスト）する」といった分散構成が可能になります。
+これにより、「大元のDomainサーバーは `192.168.1.5:40102` に存在しているが、その部屋のAssets機能だけは今このマシンで処理（ホスト）する」といった分散構成が可能になります。（`--host` と `--domain` は排他です。）
 
 ## 環境依存の排除
 上流のOverteでは、「1つのマシンに1つの部屋」が原則になっているらしく、サーバを起動するとマシンの環境変数に`HIFI_DOMAIN_SERVER_PORT`を書き込みますが、Overte HSでは環境変数への書き込みは行いません。理由は、同一マシンの異なるポートで別の部屋をホストする場合に干渉してしまうからです。ちなみに、複数の空間を同一のマシンでホストする時は以下のようにします:
