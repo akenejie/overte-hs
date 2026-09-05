@@ -60,16 +60,21 @@ int assignmentClientMain(int argc, char* argv[]);
 namespace {
 
 void printUsage(const char* prog) {
+    // POSIX positional parameters (%1$s) are a glibc extension and print
+    // literally ("$s") in the MSVC CRT, so they must not be used. Plain %s has
+    // identical semantics on every supported platform, so the same format
+    // string and the same printf call work unchanged on both Linux and Windows;
+    // the program name is passed once for each %s occurrence.
     std::printf(
         "overte-server - single-binary Overte headless VR server\n"
         "\n"
         "Usage:\n"
-        "  %1$s [--domain <port>] [--audio <port>] [--avatar <port>] [--entity <port>]\n"
+        "  %s [--domain <port>] [--audio <port>] [--avatar <port>] [--entity <port>]\n"
         "        [--entity-script <port>] [--assets <port>] [--messages <port>]\n"
         "        [--host <host[:port]>] [--data <dir>]\n"
         "        [--log-options <opts>]\n"
-        "  %1$s -h | --help\n"
-        "  %1$s --version\n"
+        "  %s -h | --help\n"
+        "  %s --version\n"
         "\n"
         "Run any combination of the Overte servers in one process group. Each --* <port>\n"
         "flag starts that server on the given UDP port:\n"
@@ -96,16 +101,16 @@ void printUsage(const char* prog) {
         "/run or /tmp, and no port is stored in any config file.\n"
         "\n"
         "Examples:\n"
-        "  %1$s --domain 40102                              # room only\n"
-        "  %1$s --domain 40102 --audio 40103 --avatar 40104 \\\n"
+        "  %s --domain 40102                              # room only\n"
+        "  %s --domain 40102 --audio 40103 --avatar 40104 \\\n"
         "        --entity 40105 --assets 40106              # full stack\n"
-        "  %1$s --domain 40102 --audio 40103 --avatar 40104 \\\n"
+        "  %s --domain 40102 --audio 40103 --avatar 40104 \\\n"
         "        --entity 40105 --entity-script 40107 --assets 40106 \\\n"
         "        --messages 40108                           # full stack + chat/scripts\n"
-        "  %1$s --entity 40105 --assets 40106 \\\n"
+        "  %s --entity 40105 --assets 40106 \\\n"
         "        --host 192.168.1.5:40102                   # remote entity+asset servers\n"
-        "  %1$s --domain 40102 --host 192.168.1.5           # register mixers to another host\n",
-        prog);
+        "  %s --domain 40102 --host 192.168.1.5           # register mixers to another host\n",
+        prog, prog, prog, prog, prog, prog, prog, prog);
 }
 
 std::string getDataDir() {
