@@ -87,9 +87,9 @@ overte-hs --data ./roomB --domain 50102 --audio 50103 --avatar 50104 --entity 50
 
 ## ライセンス
 
-本プロジェクトは、**上流の Overte（Apache License 2.0）に、アケネＪによる変更部分のライセンス（GNU Affero General Public License v3.0 / AGPLv3）を積層**した構成です。
+本プロジェクトの上流からの変更部分は **GNU Affero General Public License v3.0 (AGPLv3)** の下でライセンスされています。
 
-* **上流コード**: [Overte](https://github.com/overte-org/overte) のコードを元にしています。未改変の上流コードは引き続き Apache License 2.0 の下で提供されます（`LICENSE`）。
-* **変更部分**: ヘッドレス化・単一バイナリ化などのフォークによる変更部分の著作権はアケネＪに帰属し、AGPLv3 の下で提供されます（`LICENSE-AGPL-3.0.txt`）。詳細は `NOTICE` を参照してください。
+* **上流コード**: 本プロジェクトは[Overte](https://github.com/overte-org/overte) のコードを基にしています。上流コードは引き続き Apache License 2.0 の下で提供されます（`LICENSE`）。
+* **変更部分**: ヘッドレス化・分散化などのフォークによる変更部分の著作権はアケネＪに帰属し、AGPLv3 の下で提供されます（`LICENSE-AGPL-3.0.txt`）。詳細は `NOTICE` を参照してください。
 
 AGPLv3 第13条（ネットワーク利用）に基づき、本ソフトウェアをネットワーク経由で他の利用者に提供する場合には、修正を含む完全な Corresponding Source を同じ利用者に提供する義務が生じます。修正版のソースは本リポジトリにて公開されます。
