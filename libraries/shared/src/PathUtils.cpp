@@ -151,15 +151,43 @@ QUrl PathUtils::qmlUrl(const QString& relativeUrl) {
 }
 
 QString PathUtils::getAppDataPath() {
-    // The headless multicall launcher pins the whole server state to a single
-    // portable directory (see overte-server/src/main.cpp): config.json, entities/
-    // and assets/ live flat at its root, and QSettings/cache data is redirected
-    // to a transient cache/ subtree via the XDG_* variables.
-    const QString overriddenPath = qEnvironmentVariable("OVERTE_DATA_DIR");
-    if (!overriddenPath.isEmpty()) {
-        return QDir(overriddenPath).absolutePath() + "/";
+    // Headless mode: the launcher pins the portable data directory from --data
+    // (see overte-server/src/main.cpp). Persistent state (config.json, entities/
+    // and assets/) lives flat at its root; the transient cache/ subtree is
+    // derived from it as well. Nothing is read from environment variables.
+    const QString overrideDir = appDataDir();
+    if (!overrideDir.isEmpty()) {
+        return overrideDir + "/";
     }
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/";
+}
+
+// ---------------------------------------------------------------------------
+// overte-hs: single source of truth for the portable data directory. The
+// launcher writes it here once (--data, default ./data); fork() children on
+// POSIX inherit it, Windows children receive it as a --data argument and write
+// the same global in their own process.
+// ---------------------------------------------------------------------------
+static QString g_overrideDataDir;
+
+void PathUtils::setAppDataDir(const QString& dataDir) {
+    g_overrideDataDir = QDir(dataDir).absolutePath();
+}
+
+QString PathUtils::appDataDir() {
+    return g_overrideDataDir;
+}
+
+QString PathUtils::appDataCacheDir() {
+    return g_overrideDataDir.isEmpty() ? QString() : QDir(g_overrideDataDir).absoluteFilePath("cache");
+}
+
+QString PathUtils::appDataConfigDir() {
+    return g_overrideDataDir.isEmpty() ? QString() : QDir(g_overrideDataDir).absoluteFilePath("cache/config");
+}
+
+QString PathUtils::appDataLocalDir() {
+    return g_overrideDataDir.isEmpty() ? QString() : QDir(g_overrideDataDir).absoluteFilePath("cache/data");
 }
 
 QString PathUtils::getAppLocalDataPath() {
@@ -167,6 +195,12 @@ QString PathUtils::getAppLocalDataPath() {
     // return overridden path if set
     if (!overriddenPath.isEmpty()) {
         return overriddenPath;
+    }
+
+    // headless mode: transient local data lives in the data dir's cache/ subtree
+    const QString localDir = appDataLocalDir();
+    if (!localDir.isEmpty()) {
+        return localDir + "/";
     }
 
     // otherwise return standard path

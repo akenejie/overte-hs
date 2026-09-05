@@ -49,6 +49,17 @@ public:
     static const QString& projectRootPath();
 #endif
 
+    // overte-hs: the headless launcher pins the portable data directory once at
+    // startup right after parsing --data (default: ./data). Persistent files,
+    // transient caches and settings are all derived from it; no process
+    // environment variables are involved. The setters are a no-op for builds
+    // that never call them (they keep the standard per-user locations).
+    static void setAppDataDir(const QString& dataDir);
+    static QString appDataDir();
+    static QString appDataCacheDir();    // <data>/cache     (transient, deleted on exit)
+    static QString appDataConfigDir();   // <data>/cache/config
+    static QString appDataLocalDir();    // <data>/cache/data
+
     static QString getAppDataPath();
     static QString getAppLocalDataPath();
 

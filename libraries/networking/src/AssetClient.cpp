@@ -26,6 +26,7 @@
 #include <QtCore/QThread>
 #include <QtNetwork/QNetworkDiskCache>
 
+#include <PathUtils.h>
 #include <shared/GlobalAppProperties.h>
 #include <shared/MiniPromises.h>
 
@@ -71,12 +72,20 @@ void AssetClient::initCaching() {
     auto& networkAccessManager = NetworkAccessManager::getInstance();
     if (!networkAccessManager.cache()) {
         if (_cacheDir.isEmpty()) {
+            // overte-hs: the disk cache lives inside the portable data dir so
+            // nothing is written outside it. When unset (non-headless builds)
+            // fall back to the standard per-user location.
+            const QString headlessCacheDir = PathUtils::appDataCacheDir();
+            if (!headlessCacheDir.isEmpty()) {
+                _cacheDir = headlessCacheDir;
+            } else if (_cacheDir.isEmpty()) {
 #ifdef Q_OS_ANDROID
-            QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+                QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
 #else
-            QString cachePath = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
+                QString cachePath = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
 #endif
             _cacheDir = !cachePath.isEmpty() ? cachePath : "interfaceCache";
+            }
         }
         QNetworkDiskCache* cache = new QNetworkDiskCache();
         cache->setMaximumCacheSize(MAXIMUM_CACHE_SIZE);

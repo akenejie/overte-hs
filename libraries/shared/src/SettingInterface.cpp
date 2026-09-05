@@ -54,6 +54,14 @@ namespace Setting {
     void init() {
         // Set settings format
         QSettings::setDefaultFormat(JSON_FORMAT);
+        // overte-hs: pin the settings file into the transient cache/ subtree of
+        // the portable data dir (set by the launcher via PathUtils). Without this
+        // QSettings writes to the per-user config location (~/.config, %APPDATA%,
+        // or the Windows registry) instead.
+        const QString configDir = PathUtils::appDataConfigDir();
+        if (!configDir.isEmpty()) {
+            QSettings::setPath(JSON_FORMAT, QSettings::UserScope, configDir);
+        }
         QSettings settings;
         qCDebug(shared) << "Settings file:" << settings.fileName();
 

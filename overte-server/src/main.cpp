@@ -35,6 +35,12 @@
 #include <climits>
 #include <cctype>
 
+#include <PathUtils.h>
+
+// Byte array for the embedded default empty world, generated at build time by
+// cmake/GenerateDefaultData.cmake from default-data/entities/models.json.gz.
+#include "default_data.hpp"
+
 #if defined(_WIN32)
 #include <windows.h>
 #include <direct.h>
@@ -43,6 +49,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include <fcntl.h>
 #if defined(__linux__)
 #include <sys/prctl.h>
 #endif
@@ -66,15 +73,12 @@ void printUsage(const char* prog) {
     // string and the same printf call work unchanged on both Linux and Windows;
     // the program name is passed once for each %s occurrence.
     std::printf(
-        "overte-server - single-binary Overte headless VR server\n"
+        "Overte Headless Server - single-binary VR\n"
         "\n"
         "Usage:\n"
-        "  %s [--domain <port>] [--audio <port>] [--avatar <port>] [--entity <port>]\n"
-        "        [--entity-script <port>] [--assets <port>] [--messages <port>]\n"
-        "        [--host <host[:port]>] [--data <dir>]\n"
-        "        [--log-options <opts>]\n"
-        "  %s -h | --help\n"
-        "  %s --version\n"
+        "%s [--domain <port>] [--audio <port>] [--avatar <port>] [--entity <port>] [--entity-script <port>] [--assets <port>] [--messages <port>] [--host <host[:port]>] [--data <dir>] [--log-options <opts>]\n"
+        "%s -h | --help\n"
+        "%s --version\n"
         "\n"
         "Run any combination of the Overte servers in one process group. Each --* <port>\n"
         "flag starts that server on the given UDP port:\n"
@@ -92,24 +96,14 @@ void printUsage(const char* prog) {
         "                        the port to the --domain port; when --domain is absent the\n"
         "                        port must be given (use the host:port form).\n"
         "\n"
-        "All server state lives in a 'data' directory in the current directory by default\n"
-        "(override with --data): config.json, entities/ and assets/ are kept there, and any\n"
-        "transient cache is removed when the server shuts down. Each file belongs to one\n"
-        "server - config.json to the domain-server, entities/ to the domain/entity servers,\n"
-        "assets/ to the asset-server - so copying the folders a server owns to another\n"
-        "machine stands that server up there. Nothing is written to the home directory,\n"
-        "/run or /tmp, and no port is stored in any config file.\n"
+        "All server state lives in a 'data' directory in the current directory by default (override with --data): config.json, entities/ and assets/ are kept there, and any transient cache is removed when the server shuts down. Each file belongs to one server - config.json to the domain-server, entities/ to the domain/entity servers, assets/ to the asset-server - so copying the folders a server owns to another\n machine stands that server up there. Nothing is written to the home directory, /run or /tmp, and no port is stored in any config file.\n"
         "\n"
         "Examples:\n"
-        "  %s --domain 40102                              # room only\n"
-        "  %s --domain 40102 --audio 40103 --avatar 40104 \\\n"
-        "        --entity 40105 --assets 40106              # full stack\n"
-        "  %s --domain 40102 --audio 40103 --avatar 40104 \\\n"
-        "        --entity 40105 --entity-script 40107 --assets 40106 \\\n"
-        "        --messages 40108                           # full stack + chat/scripts\n"
-        "  %s --entity 40105 --assets 40106 \\\n"
-        "        --host 192.168.1.5:40102                   # remote entity+asset servers\n"
-        "  %s --domain 40102 --host 192.168.1.5           # register mixers to another host\n",
+        "%s --domain 40102 # room only\n"
+        "%s --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --assets 40106 # full stack\n"
+        "%s --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --entity-script 40107 --assets 40106 --messages 40108 # full stack + chat/scripts\n"
+        "%s --host 192.168.1.5:40102 --entity 40105 --assets 40106 # entity+asset servers with remote domain server\n"
+        "%s --domain 40102 --host 192.168.1.5 # register mixers to another host\n",
         prog, prog, prog, prog, prog, prog, prog, prog);
 }
 
@@ -163,14 +157,6 @@ bool makeDirs(const std::string& path) {
     return true;
 }
 
-void setEnv(const char* name, const std::string& value) {
-#if defined(_WIN32)
-    _putenv_s(name, value.c_str());
-#else
-    ::setenv(name, value.c_str(), 1);
-#endif
-}
-
 // ---------------------------------------------------------------------------
 // Data layout
 //
@@ -186,9 +172,12 @@ void setEnv(const char* name, const std::string& value) {
 //   <data-dir>/cache/        QSettings + QStandardPaths + resource caches;
 //                            deleted on exit
 //
-// Applets locate their data through PathUtils::getAppDataPath(), which honours
-// the OVERTE_DATA_DIR variable; the cache/ subtree is reached through the
-// XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME variables that point inside it.
+// Applets locate their data through PathUtils::getAppDataPath()/getAppLocalDataPath(),
+// which read the portable data dir from a process-global set via
+// PathUtils::setAppDataDir() (see PathUtils.cpp). No process environment
+// variables are involved: a POSIX fork() child inherits the global, and a
+// Windows child is spawned with a --data argument that re-arms the same global
+// in its own process.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -388,20 +377,69 @@ void migrateLegacyData(const std::string& dataDir) {
     removeTree(dataDir + "/config");
 }
 
+// Seed a freshly-created data dir with the embedded default empty world so a
+// first run starts as an empty-but-valid room instead of warning about a
+// missing entity persist file. The created-atomically and only-when-absent
+// rules make the call safe to run from every supervisor/applet process even
+// though they start at the same time, and existing user data is never touched.
+bool seedDefaultWorld(const std::string& dataDir) {
+    const std::string persistPath = dataDir + "/entities/models.json.gz";
+    if (!makeDirs(dataDir + "/entities")) {
+        std::fprintf(stderr, "overte-server: cannot create %s/entities\n", dataDir.c_str());
+        return false;
+    }
+#if defined(_WIN32)
+    HANDLE h = CreateFileA(persistPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                           FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        if (GetLastError() == ERROR_FILE_EXISTS) {
+            return true; // another process already seeded it
+        }
+        std::fprintf(stderr, "overte-server: cannot seed %s\n", persistPath.c_str());
+        return false;
+    }
+    DWORD written = 0;
+    const bool ok = WriteFile(h, gDefaultModelsJsonGz, (DWORD)gDefaultModelsJsonGzSize, &written, nullptr)
+                    && written == gDefaultModelsJsonGzSize;
+    CloseHandle(h);
+#else
+    const int fd = ::open(persistPath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+    if (fd < 0) {
+        if (errno == EEXIST) {
+            return true; // another process already seeded it
+        }
+        std::fprintf(stderr, "overte-server: cannot seed %s\n", persistPath.c_str());
+        return false;
+    }
+    const size_t written = ::write(fd, gDefaultModelsJsonGz, gDefaultModelsJsonGzSize);
+    const bool ok = (written == gDefaultModelsJsonGzSize) && (::close(fd) == 0);
+#endif
+    if (ok) {
+        std::printf("Seeded default empty world at %s\n", persistPath.c_str());
+        std::fflush(stdout); // don't let fork() children echo this line via inherited buffer
+    } else {
+        std::fprintf(stderr, "overte-server: failed to seed %s\n", persistPath.c_str());
+    }
+    return ok;
+}
+
 // Prepare <dataDir> as the single writable root for a run: migrate old layouts,
-// drop a stale cache/ from a previous crashed run, and point applets at the
-// flat data location with all transient state inside cache/.
+// drop a stale cache/ from a previous crashed run, and arm the PathUtils global
+// so applets derive all persistent and transient paths from this one directory.
 bool setupDataDir(const std::string& dataDir) {
     if (!makeDirs(dataDir)) {
         return false;
     }
     migrateLegacyData(dataDir);
+    if (!seedDefaultWorld(dataDir)) {
+        return false;
+    }
     removeTree(dataDir + "/cache");
 
-    setEnv("OVERTE_DATA_DIR", dataDir);
-    setEnv("XDG_DATA_HOME", dataDir + "/cache/data");
-    setEnv("XDG_CONFIG_HOME", dataDir + "/cache/config");
-    setEnv("XDG_CACHE_HOME", dataDir + "/cache");
+    // Arm the shared PathUtils global so applets (fork children on POSIX, or
+    // spawned --data children on Windows) derive all persistent and transient
+    // paths from this single portable directory.
+    PathUtils::setAppDataDir(QString::fromUtf8(dataDir.c_str()));
 
     makeDirs(dataDir + "/cache");
     makeDirs(dataDir + "/cache/data");
@@ -415,24 +453,25 @@ void cleanupTransientData(const std::string& dataDir) {
     removeTree(dataDir + "/cache");
 }
 
-// Look for a --data-dir <path> pair in a subcommand's arguments (the applet
-// parsers themselves do not know the option).
+// Look for a --data <path> pair in a subcommand's arguments (the applet
+// parsers themselves do not know the option, so the launcher strips it before
+// forwarding).
 std::string findDataDir(int argc, char* argv[], int firstArg) {
     for (int i = firstArg; i + 1 < argc; ++i) {
-        if (std::strcmp(argv[i], "--data-dir") == 0) {
+        if (std::strcmp(argv[i], "--data") == 0) {
             return argv[i + 1];
         }
     }
     return "";
 }
 
-// Drop --data-dir <path> pairs from an argument vector before forwarding it to
+// Drop --data <path> pairs from an argument vector before forwarding it to
 // an applet.
 void stripDataDir(std::vector<std::string>& args) {
     std::vector<std::string> kept;
     kept.reserve(args.size());
     for (size_t i = 0; i < args.size(); ++i) {
-        if (args[i] == "--data-dir" && i + 1 < args.size()) {
+        if (args[i] == "--data" && i + 1 < args.size()) {
             ++i;
         } else {
             kept.push_back(args[i]);
@@ -476,7 +515,7 @@ void forwardSignal(int) {
     g_stopRequested = 1;
 }
 
-int runChildren(std::vector<ServerSpec>& servers) {
+int runChildren(std::vector<ServerSpec>& servers, const std::string& dataDir) {
 #if defined(_WIN32)
     // Windows has no fork(): spawn each applet as a separate process of this
     // same multicall binary ("overte-server <sub> ...") and supervise the
@@ -496,8 +535,10 @@ int runChildren(std::vector<ServerSpec>& servers) {
     handles.reserve(servers.size());
 
     for (auto& spec : servers) {
-        // build command line: "this.exe <sub> <arg>..."
-        std::string cmdLine = "\"" + modulePath + "\" " + spec.labelCmd;
+        // build command line: "this.exe <sub> [--data <dir>] <arg>..." -- the
+        // --data pair re-arms the applet's data-dir global in its own process
+        std::string cmdLine = "\"" + modulePath + "\" " + spec.labelCmd
+            + " --data \"" + dataDir + "\"";
         for (auto& arg : spec.args) {
             cmdLine += " \"" + arg + "\"";
         }
@@ -610,6 +651,7 @@ int runChildren(std::vector<ServerSpec>& servers) {
     }
     return 0;
 #else
+    (void)dataDir; // Windows passes it to spawned children as --data; POSIX children inherit it via fork
     std::vector<pid_t> pids;
     pids.reserve(servers.size());
 
@@ -813,19 +855,22 @@ int flagSupervisor(int argc, char* argv[]) {
         return 1;
     }
 
+    // --domain starts the room's own domain-server, so the other servers always
+    // check in with localhost:<domain port>; there is no reason to also accept
+    // --host there. --host exists only to join an existing domain instead.
+    if (!domainPort.empty() && !host.empty()) {
+        std::fprintf(stderr, "overte-server: --host and --domain are mutually exclusive\n"
+                             "  with --domain the other servers check in with localhost:<domain port>;\n"
+                             "  without --domain use --host <host:port> to join an existing domain\n");
+        printUsage(argv[0]);
+        return 1;
+    }
+
     // registration target for the assignment-client servers
     std::string acHost, acPort;
     if (!domainPort.empty()) {
-        // local domain: mixers register to localhost:<port>, or to an explicit --host
-        acPort = domainPort;
         acHost = "localhost";
-        if (!host.empty()) {
-            std::string hostPart, portPart;
-            splitHostPort(host, hostPart, portPart);
-            if (!hostPart.empty()) {
-                acHost = hostPart;
-            }
-        }
+        acPort = domainPort;
     } else {
         // remote domain: --host must carry the domain port (host:port form)
         if (host.empty()) {
@@ -882,7 +927,7 @@ int flagSupervisor(int argc, char* argv[]) {
             { "-t", "4", "-p", messagesPort, "-a", acHost, "--server-port", acPort, "--logOptions=" + logOptions } });
     }
 
-    int result = runChildren(servers);
+    int result = runChildren(servers, dataDir);
     cleanupTransientData(dataDir);
     return result;
 }
@@ -914,10 +959,10 @@ int main(int argc, char* argv[]) {
         || sub == "assets" || sub == "messages") {
         std::string dataDir = findDataDir(argc, argv, 2);
         if (dataDir.empty()) {
-            // a supervisor-spawned child inherits OVERTE_DATA_DIR; reuse it so
-            // the parent and its applets share one data dir
-            const char* inherited = std::getenv("OVERTE_DATA_DIR");
-            dataDir = (inherited && *inherited) ? inherited : getDataDir();
+            // a Windows supervisor-spawned child always carries --data, so a
+            // missing one means this binary was invoked directly with a bare
+            // applet token; fall back to the default portable directory.
+            dataDir = getDataDir();
         }
         if (!setupDataDir(dataDir)) {
             std::fprintf(stderr, "overte-server: cannot prepare data dir %s\n", dataDir.c_str());

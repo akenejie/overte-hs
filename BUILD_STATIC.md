@@ -298,12 +298,15 @@ Notes:
   and `DomainServerSettingsManager` falls back to it when the file is absent on disk.
 - Every server runs inside one data directory (the `data/` folder in the current working
   directory by default, override with `--data`), so the whole server state is portable with
-  that folder and no user home directory, `/run` or `/tmp` is touched. `OVERTE_DATA_DIR` pins
-  `PathUtils::getAppDataPath()` to that directory, so `config.json`, `entities/` and `assets/`
-  are written flat at its root; the transient QSettings/cache data is redirected via
-  `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` into a `cache/` subtree that is deleted
-  when the server shuts down. Copying the whole data directory (or just `config.json`,
-  `entities/`, `assets/`) moves the setup to another machine.
+  that folder and no user home directory, `/run` or `/tmp` is touched. The launcher arms the
+  `PathUtils` process-global (see `PathUtils::setAppDataDir`); POSIX `fork()` children inherit
+  it and Windows children are spawned with a `--data` argument that re-arms it in their own
+  process — no environment variables are involved. That global drives
+  `PathUtils::getAppDataPath()`/`getAppLocalDataPath()` and the `Setting::` QSettings path, so
+  `config.json`, `entities/` and `assets/` are written flat at the data-dir root, and the
+  transient QSettings/cache data goes into a `cache/` subtree that is deleted when the server
+  shuts down. Copying the whole data directory (or just `config.json`, `entities/`, `assets/`)
+  moves the setup to another machine.
 - **Files are owned by one server each**, which is what makes integration and distribution
   trivial: `config.json` is read/written only by the domain-server, `assets/` only by the
   asset-server, and `entities/` by the domain-server (its backup) and the entity-server (its

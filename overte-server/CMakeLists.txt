@@ -20,6 +20,23 @@ set(TARGET_NAME overte-server)
 
 project(${TARGET_NAME})
 
+# Embed the default empty world (default-data/entities/models.json.gz) as a C
+# byte array so a freshly created --data dir can be seeded at first run
+# without any runtime data files or Qt resource dependency.
+set(DEFAULT_DATA_HPP "${CMAKE_BINARY_DIR}/includes/default_data.hpp")
+add_custom_command(
+  OUTPUT "${DEFAULT_DATA_HPP}"
+  COMMAND ${CMAKE_COMMAND}
+          -DSRC=${CMAKE_SOURCE_DIR}/default-data/entities/models.json.gz
+          -DOUT=${DEFAULT_DATA_HPP}
+          -P ${CMAKE_SOURCE_DIR}/cmake/GenerateDefaultData.cmake
+  DEPENDS "${CMAKE_SOURCE_DIR}/default-data/entities/models.json.gz"
+          "${CMAKE_SOURCE_DIR}/cmake/GenerateDefaultData.cmake"
+  COMMENT "Generating ${DEFAULT_DATA_HPP} (embedded default empty world)"
+  VERBATIM
+)
+add_custom_target(overte_server_default_data DEPENDS "${DEFAULT_DATA_HPP}")
+
 option(OVERTE_SERVER_STRIP "Strip debug symbols from the overte-server binary to shrink it" OFF)
 
 set(OVERTE_SERVER_OWN_SRCS src/main.cpp)
@@ -45,6 +62,7 @@ foreach(OVERTE_SERVER_AC_SUBDIR ${OVERTE_SERVER_AC_SUBDIRS})
 endforeach()
 
 add_executable(${TARGET_NAME} ${OVERTE_SERVER_OWN_SRCS} ${OVERTE_SERVER_DS_SRCS} ${OVERTE_SERVER_AC_SRCS} resources.qrc)
+add_dependencies(${TARGET_NAME} overte_server_default_data)
 
 # the multicall applet mains are renamed from `main` via this define
 target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_MULTICALL_APPLET)
