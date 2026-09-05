@@ -189,10 +189,11 @@ public:
     HFMBlendshape blendshape;
 };
 
+#ifndef QT_NO_DEBUG_OUTPUT
 void printNode(const FBXNode& node, int indentLevel) {
     int indentLength = 2;
     hifi::ByteArray spaces(indentLevel * indentLength, ' ');
-    QDebug nodeDebug = qDebug(modelformat);
+    QDebug nodeDebug = qCDebug(modelformat);
 
     nodeDebug.nospace() << spaces.data() << node.name.data() << ": ";
     foreach (const QVariant& property, node.properties) {
@@ -203,6 +204,7 @@ void printNode(const FBXNode& node, int indentLevel) {
         printNode(child, indentLevel + 1);
     }
 }
+#endif // !QT_NO_DEBUG_OUTPUT
 
 class Cluster {
 public:

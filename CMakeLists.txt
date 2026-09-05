@@ -205,6 +205,14 @@ if (OVERTE_HEADLESS)
     set(OVERTE_BUILD_CLIENT OFF CACHE BOOL "" FORCE)
     set(OVERTE_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
     set(OVERTE_BUILD_INSTALLER OFF CACHE BOOL "" FORCE)
+    # Release builds of the headless server only show INFO and above. Qt's
+    # QT_NO_DEBUG_OUTPUT turns every qCDebug(...) into a `while(false)` no-op
+    # at compile time, so DEBUG logging is dead code that the optimizer removes
+    # entirely from the binary (it never even evaluates the message arguments).
+    # INFO/WARNING/CRITICAL are untouched. Kept to release configs so Debug
+    # builds retain full logging for development.
+    add_compile_definitions($<$<CONFIG:Release>:QT_NO_DEBUG_OUTPUT>)
+    add_compile_definitions($<$<CONFIG:RelWithDebInfo>:QT_NO_DEBUG_OUTPUT>)
 endif()
 
 if (OVERTE_DISABLE_KTX_CACHE)
@@ -279,12 +287,6 @@ if (ANDROID)
   return()
 endif()
 
-if (BUILD_GPU_FRAME_PLAYER_ONLY)
-    # This is for CI build testing
-    add_subdirectory(tools/gpu-frame-player)
-else()
-
-# OVERTE_BUILD_TOOLS option will be handled inside the tools's CMakeLists.txt because 'scribe' tool is required for build anyway
 add_subdirectory(tools)
 
 # add subdirectories for all targets
@@ -293,8 +295,6 @@ if (OVERTE_BUILD_SERVER)
   set_target_properties(assignment-client PROPERTIES FOLDER "Apps")
   add_subdirectory(domain-server)
   set_target_properties(domain-server PROPERTIES FOLDER "Apps")
-  add_subdirectory(ice-server)
-  set_target_properties(ice-server PROPERTIES FOLDER "Apps")
   add_subdirectory(overte-server)
   set_target_properties(overte-server PROPERTIES FOLDER "Apps")
 endif()
@@ -322,8 +322,6 @@ if (OVERTE_BUILD_CLIENT OR OVERTE_BUILD_SERVER)
     add_subdirectory(plugins)
     add_subdirectory(server-console)
   endif()
-endif()
-
 endif()
 
 if (OVERTE_BUILD_TESTS)

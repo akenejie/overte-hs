@@ -35,6 +35,7 @@ int numberOfThreeBitSectionsInCode(const unsigned char* octalCode, int maxBytes)
     }
 }
 
+#ifndef QT_NO_DEBUG_OUTPUT
 void printOctalCode(const unsigned char* octalCode) {
     if (!octalCode) {
         qDebug("NULL");
@@ -45,6 +46,7 @@ void printOctalCode(const unsigned char* octalCode) {
         }
     }
 }
+#endif // !QT_NO_DEBUG_OUTPUT
 
 char sectionValue(const unsigned char* startByte, char startIndexInByte) {
     int8_t rightShift = 8 - startIndexInByte - 3;

@@ -101,7 +101,7 @@ QByteArray DataServerAccountInfo::getUsernameSignature(const QUuid& connectionTo
 
     auto signature = signPlaintext(plaintext);
     if (!signature.isEmpty()) {
-        qDebug(networking) << "Returning username" << _username
+        qCDebug(networking) << "Returning username" << _username
             << "signed with connection UUID" << uuidStringWithoutCurlyBraces(connectionToken);
     } else {
         qCDebug(networking) << "Error signing username with connection token";

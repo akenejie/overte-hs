@@ -140,7 +140,7 @@ bool AnimBlendDirectional::lookupChildIds() {
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
             if (_childIndices[i][j] == -1) {
-                qDebug(animation) << "Error in AnimBlendDirectional::lookupChildIds() could not find child[" << i << "," << j << "]";
+                qCDebug(animation) << "Error in AnimBlendDirectional::lookupChildIds() could not find child[" << i << "," << j << "]";
                 return false;
             }
         }

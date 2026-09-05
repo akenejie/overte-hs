@@ -2,11 +2,9 @@ set(TARGET_NAME image)
 
 
 setup_hifi_library()
-if (OVERTE_HEADLESS)
-    # Headless servers do not link OpenEXR. Exclude the reader so the library
-    # builds without the OpenEXR headers.
-    set_source_files_properties(src/image/OpenEXRReader.cpp PROPERTIES HEADER_FILE_ONLY TRUE SKIP_AUTOMOC TRUE)
-endif()
+# The OpenEXR reader implementation (OpenEXRReader.cpp) was removed in this
+# headless fork; its header is kept because TextureProcessing.cpp references it.
+# The library still links OpenEXR so the header-only dependency resolves.
 link_hifi_libraries(shared gpu)
 target_nvtt()
 target_tbb()

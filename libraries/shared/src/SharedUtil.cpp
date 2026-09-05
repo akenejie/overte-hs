@@ -168,12 +168,15 @@ bool shouldDo(float desiredInterval, float deltaTime) {
     return randFloat() < deltaTime / desiredInterval;
 }
 
+#ifndef QT_NO_DEBUG_OUTPUT
 void outputBufferBits(const unsigned char* buffer, int length, QDebug* continuedDebug) {
     for (int i = 0; i < length; i++) {
         outputBits(buffer[i], continuedDebug);
     }
 }
+#endif // !QT_NO_DEBUG_OUTPUT
 
+#ifndef QT_NO_DEBUG_OUTPUT
 void outputBits(unsigned char byte, QDebug* continuedDebug) {
     QDebug debug = qDebug().nospace();
 
@@ -201,6 +204,7 @@ void outputBits(unsigned char byte, QDebug* continuedDebug) {
     debug.noquote();
     debug << resultString;
 }
+#endif // !QT_NO_DEBUG_OUTPUT
 
 int numberOfOnes(unsigned char byte) {
 
@@ -451,6 +455,7 @@ unsigned char* pointToVoxel(float x, float y, float z, float s, unsigned char r,
     return voxelOut;
 }
 
+#ifndef QT_NO_DEBUG_OUTPUT
 void printVoxelCode(unsigned char* voxelCode) {
     unsigned char octets = voxelCode[0];
     unsigned int voxelSizeInBits = octets*3;
@@ -470,6 +475,7 @@ void printVoxelCode(unsigned char* voxelCode) {
         outputBits(voxelCode[i], &voxelBufferDebug);
     }
 }
+#endif // !QT_NO_DEBUG_OUTPUT
 
 #ifdef _WIN32
 void usleep(int waitTime) {

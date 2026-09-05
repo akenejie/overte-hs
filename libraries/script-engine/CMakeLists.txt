@@ -19,13 +19,13 @@ if (MSVC)
 endif()
 if (OVERTE_HEADLESS)
     target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_NO_QTWEBSOCKET)
-    # QtWebSockets is not built in the headless Qt. Exclude the WebSocket
-    # classes entirely (the sources are already guarded by OVERTE_NO_QTWEBSOCKET)
-    # and stop AUTOMOC from processing their headers.
+    # QtWebSockets is not built in the headless Qt. The WebSocket implementations
+    # (WebSocketClass.cpp / WebSocketServerClass.cpp) were removed in this
+    # headless fork; their headers stay because ScriptManager.cpp references
+    # them (the sources are already guarded by OVERTE_NO_QTWEBSOCKET). Keep
+    # AUTOMOC off the remaining headers.
     set_source_files_properties(
-        src/WebSocketClass.cpp
         src/WebSocketClass.h
-        src/WebSocketServerClass.cpp
         src/WebSocketServerClass.h
         PROPERTIES HEADER_FILE_ONLY TRUE SKIP_AUTOMOC TRUE
     )

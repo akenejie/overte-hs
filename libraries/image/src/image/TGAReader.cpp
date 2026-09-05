@@ -79,14 +79,14 @@ image::Image image::readTGA(QIODevice& content) {
     content.read((char*)&header.imageDescriptor, 1);
 
     if (WANT_DEBUG) {
-        qDebug(imagelogging) << "Id Length: " << (int)header.idLength;
-        qDebug(imagelogging) << "Color map: " << (int)header.colorMap.firstEntryIndex << header.colorMap.length << header.colorMap.entrySize;
-        qDebug(imagelogging) << "Color map type: " << (int)header.colorMapType;
-        qDebug(imagelogging) << "Image type: " << (int)header.imageType;
-        qDebug(imagelogging) << "Origin: " << header.xOrigin << header.yOrigin;
-        qDebug(imagelogging) << "Size: " << header.width << header.height;
-        qDebug(imagelogging) << "Depth: " << header.pixelDepth;
-        qDebug(imagelogging) << "Image desc: " << header.imageDescriptor.attributeBitsPerPixel << (int)header.imageDescriptor.orientation;
+        qCDebug(imagelogging) << "Id Length: " << (int)header.idLength;
+        qCDebug(imagelogging) << "Color map: " << (int)header.colorMap.firstEntryIndex << header.colorMap.length << header.colorMap.entrySize;
+        qCDebug(imagelogging) << "Color map type: " << (int)header.colorMapType;
+        qCDebug(imagelogging) << "Image type: " << (int)header.imageType;
+        qCDebug(imagelogging) << "Origin: " << header.xOrigin << header.yOrigin;
+        qCDebug(imagelogging) << "Size: " << header.width << header.height;
+        qCDebug(imagelogging) << "Depth: " << header.pixelDepth;
+        qCDebug(imagelogging) << "Image desc: " << header.imageDescriptor.attributeBitsPerPixel << (int)header.imageDescriptor.orientation;
     }
 
     if (header.xOrigin != 0 || header.yOrigin != 0) {

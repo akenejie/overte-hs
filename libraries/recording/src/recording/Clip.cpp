@@ -66,7 +66,7 @@ bool writeFrame(QIODevice& output, const Frame& frame, bool compressed = true) {
     if (written != sizeof(FrameType)) {
         return false;
     }
-    //qDebug(recordingLog) << "Writing frame with time offset " << frame.timeOffset;
+    //qCDebug(recordingLog) << "Writing frame with time offset " << frame.timeOffset;
     written = output.write((char*)&(frame.timeOffset), sizeof(Frame::Time));
     if (written != sizeof(Frame::Time)) {
         return false;

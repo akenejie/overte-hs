@@ -572,7 +572,7 @@ void OctreeServer::domainSettingsRequestComplete() {
     packetReceiver.registerListener(getMyQueryMessageType(),
         PacketReceiver::makeSourcedListenerReference<OctreeServer>(this, &OctreeServer::handleOctreeQueryPacket));
 
-    qDebug(octree_server) << "Received domain settings";
+    qCDebug(octree_server) << "Received domain settings";
 
     readConfiguration();
 

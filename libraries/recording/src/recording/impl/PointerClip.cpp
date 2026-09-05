@@ -32,7 +32,7 @@ FrameTranslationMap parseTranslationMap(const QJsonDocument& doc) {
         auto frameTypeObj = headerObj[Clip::FRAME_TYPE_MAP].toObject();
         auto currentFrameTypes = Frame::getFrameTypes();
         for (auto frameTypeName : frameTypeObj.keys()) {
-            qDebug(recordingLog) << frameTypeName;
+            qCDebug(recordingLog) << frameTypeName;
             if (!currentFrameTypes.contains(frameTypeName)) {
                 continue;
             }
@@ -66,10 +66,10 @@ PointerFrameHeaderList parseFrameHeaders(uchar* const start, const size_t& size)
         current += header.size;
         results.push_back(header);
     }
-    qDebug(recordingLog) << "Parsed source data into " << results.size() << " frames";
+    qCDebug(recordingLog) << "Parsed source data into " << results.size() << " frames";
 //    int i = 0;
 //    for (const auto& frameHeader : results) {
-//        qDebug(recordingLog) << "Frame " << i++ << " time " << frameHeader.timeOffset << " Type " << frameHeader.type;
+//        qCDebug(recordingLog) << "Frame " << i++ << " time " << frameHeader.timeOffset << " Type " << frameHeader.type;
 //    }
     return results;
 }

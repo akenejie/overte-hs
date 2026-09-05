@@ -10,11 +10,9 @@ include_hifi_library_headers(image)
 include_hifi_library_headers(ktx)
 
 if (OVERTE_HEADLESS)
-    # Draco is not available in the headless build.
-    set_source_files_properties(
-        src/model-baker/BuildDracoMeshTask.cpp
-        PROPERTIES HEADER_FILE_ONLY TRUE SKIP_AUTOMOC TRUE
-    )
+    # Draco is not available in the headless build. BuildDracoMeshTask.cpp was
+    # removed in this headless fork; its header stays because Baker.cpp
+    # references it (and is internally guarded by OVERTE_HEADLESS).
 else()
     target_draco()
 endif()

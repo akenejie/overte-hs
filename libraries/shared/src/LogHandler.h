@@ -187,6 +187,12 @@ private:
     static QRecursiveMutex _mutex;
 };
 
+// The HIFI_FCDEBUG family is Overte's own debug logging: it checks the
+// category at runtime and funnels repeatable messages through LogHandler.
+// Qt's QT_NO_DEBUG_OUTPUT does NOT know about these macros, so in release
+// builds (where we compile debug logging out entirely) they must be no-ops
+// here to avoid leaving dead DEBUG code in the binary.
+#if !defined(QT_NO_DEBUG_OUTPUT)
 #define HIFI_FCDEBUG(category, message) \
     do { \
         if (category.isDebugEnabled()) { \
@@ -213,5 +219,13 @@ private:
     } while (false)
 
 #define HIFI_FDEBUG_ID(messageID, message) HIFI_FCDEBUG_ID((*QLoggingCategory::defaultCategory()), messageID, message)
+
+#else
+// Keep the macros usable (statement context) but compile them to nothing.
+#define HIFI_FCDEBUG(category, message) do { } while (false)
+#define HIFI_FDEBUG(message) do { } while (false)
+#define HIFI_FCDEBUG_ID(category, messageID, message) do { } while (false)
+#define HIFI_FDEBUG_ID(messageID, message) do { } while (false)
+#endif // !QT_NO_DEBUG_OUTPUT
 
 #endif // hifi_LogHandler_h

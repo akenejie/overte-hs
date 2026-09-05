@@ -208,7 +208,7 @@ void AssignmentClient::handleCreateAssignmentPacket(QSharedPointer<ReceivedMessa
     _currentAssignment = AssignmentFactory::unpackAssignment(*message);
 
     if (_currentAssignment && !_isAssigned) {
-        qDebug(assignment_client) << "Received an assignment -" << *_currentAssignment;
+        qCDebug(assignment_client) << "Received an assignment -" << *_currentAssignment;
         _isAssigned = true;
 
         auto nodeList = DependencyManager::get<NodeList>();
