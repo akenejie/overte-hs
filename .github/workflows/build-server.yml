@@ -403,10 +403,27 @@ jobs:
               echo "delete it manually or bump VERSION to create a new draft, then re-run." >&2
               exit 1
             fi
+          fi
+
+          # The release title carries the latest commit name of this build so the
+          # draft advertises exactly what it was built from. works for push to
+          # master, PR head and workflow_dispatch because github.sha is the event
+          # commit. On API failure fall back to the plain title (no checkout in
+          # this job, so the commit is fetched via the API).
+          commit_name="$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}" \
+            --jq '.commit.message' 2>/dev/null | head -1)" || true
+          title="${{ env.BINARY }} v${{ env.VERSION }}"
+          if [ -n "$commit_name" ]; then
+            title="$title - $commit_name"
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # rename the existing draft to today's latest-commit title and refresh assets
+            gh release edit "$tag" --title "$title"
             gh release upload "$tag" dist/overte-hs_v${{ env.VERSION }}_* --clobber
           else
             gh release create "$tag" --draft \
-              --title "${{ env.BINARY }} v${{ env.VERSION }}" \
+              --title "$title" \
               dist/overte-hs_v${{ env.VERSION }}_*
           fi
           gh release view "$tag" --json tagName,name,isDraft,assets -q \

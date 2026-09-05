@@ -859,8 +859,9 @@ int flagSupervisor(int argc, char* argv[]) {
     // --host there. --host exists only to join an existing domain instead.
     if (!domainPort.empty() && !host.empty()) {
         std::fprintf(stderr, "overte-server: --host and --domain are mutually exclusive\n"
-                             "  with --domain the other servers check in with localhost:<domain port>;\n"
-                             "  without --domain use --host <host:port> to join an existing domain\n");
+                             "  --host means the other servers join an EXTERNAL domain, while\n"
+                             "  --domain starts your own domain on this machine, so the two cannot\n"
+                             "  be combined (use --host <host:port> without --domain to join an external domain)\n");
         printUsage(argv[0]);
         return 1;
     }
