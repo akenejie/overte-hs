@@ -15,7 +15,7 @@
 # admin rights, no Qt runtime, no machine-specific paths baked in. Ports are
 # command-line arguments. Windows production builds use MSVC (not MinGW).
 #
-# Build targets (binary name -> overte-hs_v0.1.0_<os>_<arch>):
+# Build targets (binary name -> overte-hs_v<version>_<os>_<arch>):
 #   native    linux-amd64 (ubuntu-24.04),        linux-arm64 (ubuntu-24.04-arm),
 #             darwin-amd64 (macos-15-intel),     darwin-arm64 (macos-15)
 #   emulated  linux-386 (i386/debian + QEMU),    linux-arm (arm32v7 + QEMU)
@@ -45,8 +45,12 @@ on:
 permissions:
   contents: write
 
+# VERSION is not hardcoded here: version.txt at the repository root is the
+# single source of truth. It is read once at the top of every job (after
+# checkout) into the $VERSION env var, so a version bump is a one-line edit to
+# version.txt that flows into the API/app binary, the release tag/title and the
+# staged binary names `overte-hs_v<version>_<os>_<arch>` alike.
 env:
-  VERSION: 0.1.0
   BINARY: overte-hs
 
 jobs:
@@ -78,6 +82,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Read version from version.txt
+        run: echo "VERSION=$(cat version.txt)" >> "$GITHUB_ENV"
 
       - name: Rust toolchain (for rust-udp)
         uses: dtolnay/rust-toolchain@stable
@@ -178,6 +185,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Read version from version.txt
+        run: echo "VERSION=$(cat version.txt)" >> "$GITHUB_ENV"
+
       - name: QEMU binfmt (cross-arch container support)
         uses: docker/setup-qemu-action@v3
 
@@ -259,6 +269,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Read version from version.txt
+        shell: pwsh
+        run: |
+          $version = (Get-Content -Path version.txt | Select-Object -First 1).Trim()
+          Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$version"
 
       - name: Rust toolchain (for rust-udp)
         uses: dtolnay/rust-toolchain@stable
@@ -342,10 +358,12 @@ jobs:
           path: dist/${{ env.BINARY }}_v${{ env.VERSION }}_${{ matrix.bin }}.exe
           if-no-files-found: error
 
-  # --- Draft release ----------------------------------------------------------
-  # Runs even if some build jobs failed (always()); assembles a draft release
-  # from whatever binaries succeeded. Runs on every build event (push, PR,
-  # manual) so each build produces/refreshes a draft.
+  # --- Draft/final release ----------------------------------------------------
+  # Runs even if some build jobs failed (always()); assembles a release from
+  # whatever binaries succeeded. Runs on every build event (push, PR, manual):
+  # the first run drafts a release with the binaries, and each later run just
+  # renames an existing one (draft or published) to the latest-commit title -
+  # only the title is ever changed. Nothing is deleted or re-created.
   release:
     name: Draft release
     needs: [native, emulated, windows]
@@ -355,6 +373,19 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/master'))
     runs-on: ubuntu-24.04
     steps:
+      - name: Checkout version.txt only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          # Sparse checkout of just version.txt: heavy build artifacts are
+          # downloaded in the next step, and only the release version is needed
+          # to derive the tag/title. Nothing else in this job reads the tree.
+          sparse-checkout: version.txt
+          sparse-checkout-cone-mode: false
+
+      - name: Read version from version.txt
+        run: echo "VERSION=$(cat version.txt)" >> "$GITHUB_ENV"
+
       - name: Download built binaries
         uses: actions/download-artifact@v4
         with:
@@ -374,9 +405,9 @@ jobs:
       - name: Create or update draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # This job does no checkout (artifacts are downloaded from the run),
-          # so there is no .git for gh to discover the repo from; point it at
-          # the repo explicitly or it fails with "not a git repository".
+          # This job sparse-checks out only version.txt, so there is no .git for
+          # gh to discover the repo from; point it at the repo explicitly or it
+          # fails with "not a git repository".
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -391,20 +422,13 @@ jobs:
             exit 0
           fi
 
-          # Safety rules:
-          #  - We only ever create a DRAFT and only ever update an existing DRAFT.
-          #  - A PUBLISHED release with the same tag is never modified or deleted;
-          #    instead the job fails loudly so a human resolves the conflict.
-          #  - Nothing in this job can delete or alter any other release/tag.
-          if gh release view "$tag" >/dev/null 2>&1; then
-            is_draft="$(gh release view "$tag" --json isDraft -q .isDraft)"
-            if [ "$is_draft" != "true" ]; then
-              echo "error: a PUBLISHED release '$tag' already exists - refusing to touch it." >&2
-              echo "delete it manually or bump VERSION to create a new draft, then re-run." >&2
-              exit 1
-            fi
-          fi
-
+          # Behavior:
+          #  - If no release with this tag exists yet, create a DRAFT carrying
+          #    the binaries and the latest-commit title.
+          #  - If one already exists (draft or published), just rename its
+          #    title to the latest-commit title. Nothing else is touched:
+          #    binaries are never re-uploaded, nothing is recreated or deleted.
+          #
           # The release title carries the latest commit name of this build so the
           # draft advertises exactly what it was built from. works for push to
           # master, PR head and workflow_dispatch because github.sha is the event
@@ -418,9 +442,8 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            # rename the existing draft to today's latest-commit title and refresh assets
+            # existing release (draft or published): rename only
             gh release edit "$tag" --title "$title"
-            gh release upload "$tag" dist/overte-hs_v${{ env.VERSION }}_* --clobber
           else
             gh release create "$tag" --draft \
               --title "$title" \

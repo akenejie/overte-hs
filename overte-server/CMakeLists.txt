@@ -37,6 +37,24 @@ add_custom_command(
 )
 add_custom_target(overte_server_default_data DEPENDS "${DEFAULT_DATA_HPP}")
 
+# Embed the release version as a C macro so `--version` reports the same number
+# the release pipeline uses for tags and binary names. version.txt at the
+# repository root is the single source of truth - bump it in one place and the
+# binary, the GitHub Actions tags/binaries and this header all follow.
+set(OVERTE_HS_VERSION_HPP "${CMAKE_BINARY_DIR}/includes/overte_hs_version.hpp")
+add_custom_command(
+  OUTPUT "${OVERTE_HS_VERSION_HPP}"
+  COMMAND ${CMAKE_COMMAND}
+          -DSRC=${CMAKE_SOURCE_DIR}/version.txt
+          -DOUT=${OVERTE_HS_VERSION_HPP}
+          -P ${CMAKE_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+  DEPENDS "${CMAKE_SOURCE_DIR}/version.txt"
+          "${CMAKE_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake"
+  COMMENT "Generating ${OVERTE_HS_VERSION_HPP} (overte-hs version)"
+  VERBATIM
+)
+add_custom_target(overte_server_version DEPENDS "${OVERTE_HS_VERSION_HPP}")
+
 option(OVERTE_SERVER_STRIP "Strip debug symbols from the overte-server binary to shrink it" OFF)
 
 set(OVERTE_SERVER_OWN_SRCS src/main.cpp)
@@ -62,7 +80,7 @@ foreach(OVERTE_SERVER_AC_SUBDIR ${OVERTE_SERVER_AC_SUBDIRS})
 endforeach()
 
 add_executable(${TARGET_NAME} ${OVERTE_SERVER_OWN_SRCS} ${OVERTE_SERVER_DS_SRCS} ${OVERTE_SERVER_AC_SRCS} resources.qrc)
-add_dependencies(${TARGET_NAME} overte_server_default_data)
+add_dependencies(${TARGET_NAME} overte_server_default_data overte_server_version)
 
 # the multicall applet mains are renamed from `main` via this define
 target_compile_definitions(${TARGET_NAME} PRIVATE OVERTE_MULTICALL_APPLET)

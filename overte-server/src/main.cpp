@@ -41,6 +41,12 @@
 // cmake/GenerateDefaultData.cmake from default-data/entities/models.json.gz.
 #include "default_data.hpp"
 
+// Release version as a C macro, generated at build time by
+// cmake/GenerateVersionHeader.cmake from version.txt at the repository root
+// (the single source of truth). `--version` reports it so the running binary
+// matches the GitHub Actions tag and binary name.
+#include "overte_hs_version.hpp"
+
 #if defined(_WIN32)
 #include <windows.h>
 #include <direct.h>
@@ -65,6 +71,10 @@ int domainServerMain(int argc, char* argv[]);
 int assignmentClientMain(int argc, char* argv[]);
 
 namespace {
+
+void printVersion() {
+    std::printf("overte-hs %s (overte-server multicall binary)\n", OVERTE_HS_VERSION);
+}
 
 void printUsage(const char* prog) {
     // POSIX positional parameters (%1$s) are a glibc extension and print
@@ -836,7 +846,7 @@ int flagSupervisor(int argc, char* argv[]) {
             printUsage(argv[0]);
             return 0;
         } else if (arg == "--version") {
-            std::printf("overte-server multicall binary\n");
+            printVersion();
             return 0;
         } else {
             std::fprintf(stderr, "overte-server: unknown option: %s\n", arg.c_str());
@@ -948,7 +958,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (sub == "version" || sub == "--version") {
-        std::printf("overte-server multicall binary\n");
+        printVersion();
         return 0;
     }
 
