@@ -1,7 +1,100 @@
-# Overte Headless-Server (Unofficial) (日本語)
+# Overte Headless-Server (Unofficial) (English)
 
-> [!CAUTION]
-> このプロジェクトは動作確認が完了していないアルファ版です。
+## Concept: should information be bound to physics?
+
+Are you enjoying VR?
+Across distance, you can share the same space with people in Tokyo, Osaka, or even overseas. Truly wonderful technology. Among it all, Overte's greatest strength is that it is not "a platform managed by some big company," but rather a space that you manage and own yourself.
+
+But let me ask you one question.
+
+**What does your "room" currently depend on to survive?**
+
+Is it hosted on someone's PC?
+If that machine loses power, is the space no longer accessible?
+Isn't your VR space's life bound to "physics" in the form of specific hardware?
+
+Information should not, in essence, be bound to a specific physical medium — it should be far more fluid.
+If we could create a "room that does not depend on a specific machine"... if one server becomes unavailable and your space revives simply by quickly relaunching it on someone else's PC, then that VR space can be said to live on. Like human memory, as long as just one person carries the information (space) forward, it does not die.
+
+That is why I conceived of making Overte a portable headless-server (HS).
+
+This project aims to escape environmental dependency, starting with the need for installation.
+- Consists of a **single executable file**; no installation required.
+- **No administrator privileges required**; simply specify a port number and instantly host a VR space on localhost.
+- **Fully portable**: all space-related data is saved under the `data/` folder below the current working directory at launch (changeable to any location with `--data <dir>`).
+
+In other words, if you copy this `data/` folder to another machine, you can host exactly the same room anywhere, regardless of OS or CPU.
+
+## Basic usage
+The basics: call the program by specifying the port for each role, as follows.
+
+```bash
+overte-hs --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --assets 40106 --entity-script 40107 --messages 40108
+```
+
+This assigns a role to each specified port (domain: 40102, audio: 40103...) and the VR space starts to beat.
+
+> **You are free to choose your ports.** Even if you set `--domain` to something other than 40102 (e.g. `--domain 50102`), it just works as long as you keep specifying the ports of the other servers that register with that domain (audio 50103...). Port numbers are not saved in any configuration file, so they can be decided freely per machine and per space.
+
+### Connecting from the client (Interface)
+The Overte client is built on the assumption that a specific machine and a specific room are linked: hosting multiple rooms on a single machine is not anticipated, the port number is fixed at 40102 or by an environment variable, and the port cannot be changed from within the GUI. To connect to a room hosted by Overte HS, a little trick is therefore required on the client side.
+Specifically, launch the client with the `HIFI_DOMAIN_SERVER_PORT` environment variable temporarily set to the same value as the server's domain port.
+```bash
+# If the server was started on 50102, specify the same port on the client
+HIFI_DOMAIN_SERVER_PORT=50102 ./Overte.AppImage
+```
+```bat
+set HIFI_DOMAIN_SERVER_PORT=50102 & "C:\Program Files\Overte\interface.exe"
+```
+After launch, press `Ctrl+L` inside the Interface, enter any host name and connect (the port is taken automatically from the environment variable).
+
+By the way, when the environment variable is not set, the Overte client hardcodes `40102` as the default port. If you set `--domain` to anything other than 40102, make sure `HIFI_DOMAIN_SERVER_PORT` matches on the client side too. If you forget this, the client keeps sending check-ins to 40102 and the connection is never established.
+(Incidentally, when Akenejie hosted the server locally and entered the room by pressing `Ctrl+L` and specifying the port with `hifi://localhost:50102`, it connected, was disconnected after about 2 seconds, reconnected after another 2 seconds or so, and repeated that loop.)
+
+### Space separation and distribution
+Within the generated folder (default `data/`), the role of each server is clearly divided.
+
+| Server role | Storage location inside the data folder |
+| --- | --- |
+| domain | `config.json` (settings only) |
+| entity | `entities/` (space data) |
+| asset | `assets/` |
+
+Each server manages its own data autonomously. The domain-server holds none of the entity-server's data and coordinates purely over the network. This makes each server independently copyable, movable and restorable.
+
+For example, copy only a specific data folder (here `assets/`) to another machine and run the following:
+```
+overte-hs --host 192.168.1.5:40102 --assets 40106
+```
+
+This enables distributed configurations such as "the origin Domain server lives on `192.168.1.5:40102`, but only the room's assets function is being processed (hosted) here on this machine right now".
+
+## Eliminating environmental dependency
+In upstream Overte, "one room per machine" is apparently the principle: when the server starts, it writes `HIFI_DOMAIN_SERVER_PORT` into the machine's environment variables. Overte HS does not write environment variables, because hosting different rooms on the same machine using different ports would interfere with each other. When hosting multiple spaces on a single machine, do it like this:
+```bash
+# Space A: ports in the 40102 range
+overte-hs --data ./roomA --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --assets 40106 --entity-script 40107 --messages 40108
+# Space B: ports in the 50102 range (client launched in a separate window with HIFI_DOMAIN_SERVER_PORT=50102)
+overte-hs --data ./roomB --domain 50102 --audio 50103 --avatar 50104 --entity 50105 --assets 50106 --entity-script 50107 --messages 50108
+```
+Only the client connecting to Space B needs to be started with `HIFI_DOMAIN_SERVER_PORT=50102`, so the two spaces do not interfere with each other.
+
+### Connecting to a room over the Internet
+Overte HS does not include the centralized server registration feature that upstream implements; the only communication Overte HS performs is to send and receive with clients that access the ports listening on that machine. To communicate over the Internet, preparations that Overte HS does not support — such as a global IP or port forwarding — are required.
+Incidentally, Akenejie uses tunnneji-tail, made as a Tailscale client. With tunnneji-tail, you can share specific ports with specific people only and with a password, so you can create rooms that only certain people can enter. If the person you shared with NATs to 40102, the temporary environment variable is no longer needed.
+
+## License
+
+The modifications from upstream in this project are licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+
+* **Upstream code**: This project is based on [Overte](https://github.com/overte-org/overte). The upstream code remains under the Apache License 2.0 (`LICENSE`).
+* **Modified portions**: The copyright of the fork's modifications, such as the headless conversion and decentralization, belongs to Akenejie, and they are provided under AGPLv3 (`LICENSE-AGPL-3.0.txt`). See `NOTICE` for details.
+
+Under section 13 of the AGPLv3, when this software (or a modified version of it) is made available to users over a network, you are obliged to make the complete corresponding source code (Corresponding Source), including modifications, freely obtainable by those users over the network.
+
+---
+
+# Overte Headless-Server (Unofficial) (日本語)
 
 ## コンセプト：情報は物理に縛られるべきか？
 
@@ -92,4 +185,4 @@ overte-hs --data ./roomB --domain 50102 --audio 50103 --avatar 50104 --entity 50
 * **上流コード**: 本プロジェクトは[Overte](https://github.com/overte-org/overte) のコードを基にしています。上流コードは引き続き Apache License 2.0 の下で提供されます（`LICENSE`）。
 * **変更部分**: ヘッドレス化・分散化などのフォークによる変更部分の著作権はアケネＪに帰属し、AGPLv3 の下で提供されます（`LICENSE-AGPL-3.0.txt`）。詳細は `NOTICE` を参照してください。
 
-AGPLv3 第13条（ネットワーク利用）に基づき、本ソフトウェアをネットワーク経由で他の利用者に提供する場合には、修正を含む完全な Corresponding Source を同じ利用者に提供する義務が生じます。修正版のソースは本リポジトリにて公開されます。
+AGPLv3 第13条に基づき、本ソフトウェア（またはその改変版）をネットワーク経由でユーザーに提供・利用させる場合、改変を含む完全な対応ソースコード（Corresponding Source）を、ネットワーク経由でそのユーザーが無償で取得できるようにする義務が生じます。
