@@ -72,11 +72,27 @@ int assignmentClientMain(int argc, char* argv[]);
 
 namespace {
 
+// Last path component of a raw string, handling both '/' and '\' so argv[0] is
+// normalized the same way on POSIX and Windows.
+std::string fileNameOf(const char* path) {
+    if (!path || !*path) {
+        return "overte-server";
+    }
+    std::string p(path);
+    size_t pos = p.find_last_of("/\\");
+    return (pos == std::string::npos) ? p : p.substr(pos + 1);
+}
+
 void printVersion() {
     std::printf("overte-hs %s (overte-server multicall binary)\n", OVERTE_HS_VERSION);
 }
 
 void printUsage(const char* prog) {
+    // Show only the executable's own file name, never the path it was invoked
+    // with (argv[0] is a bare name on Windows but often "./path/.../overte-server"
+    // on POSIX). Long paths wrap and look different per OS, so normalize all
+    // platforms to the basename.
+    const std::string progName = fileNameOf(prog ? prog : "overte-server");
     // POSIX positional parameters (%1$s) are a glibc extension and print
     // literally ("$s") in the MSVC CRT, so they must not be used. Plain %s has
     // identical semantics on every supported platform, so the same format
@@ -113,7 +129,7 @@ void printUsage(const char* prog) {
         "%s --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --assets 40106 # full stack\n"
         "%s --domain 40102 --audio 40103 --avatar 40104 --entity 40105 --entity-script 40107 --assets 40106 --messages 40108 # full stack + chat/scripts\n"
         "%s --entity 40105 --assets 40106 --host 192.168.1.5:40102 # entity+asset servers with an existing domain\n",
-        prog, prog, prog, prog, prog, prog, prog);
+        progName.c_str(), progName.c_str(), progName.c_str(), progName.c_str(), progName.c_str(), progName.c_str(), progName.c_str());
 }
 
 std::string getDataDir() {
@@ -231,8 +247,7 @@ bool isFile(const std::string& path) {
 }
 
 std::string fileNameOf(const std::string& path) {
-    size_t pos = path.find_last_of("/\\");
-    return (pos == std::string::npos) ? path : path.substr(pos + 1);
+    return fileNameOf(path.c_str());
 }
 
 bool renamePath(const std::string& from, const std::string& to) {
@@ -435,6 +450,8 @@ bool seedDefaultWorld(const std::string& dataDir) {
 // Prepare <dataDir> as the single writable root for a run: migrate old layouts,
 // drop a stale cache/ from a previous crashed run, and arm the PathUtils global
 // so applets derive all persistent and transient paths from this one directory.
+// Destructive and only safe to run once, before any other process of the same
+// data dir is alive.
 bool setupDataDir(const std::string& dataDir) {
     if (!makeDirs(dataDir)) {
         return false;
@@ -450,6 +467,29 @@ bool setupDataDir(const std::string& dataDir) {
     // paths from this single portable directory.
     PathUtils::setAppDataDir(QString::fromUtf8(dataDir.c_str()));
 
+    makeDirs(dataDir + "/cache");
+    makeDirs(dataDir + "/cache/data");
+    makeDirs(dataDir + "/cache/config");
+    return true;
+}
+
+// Idempotent, non-destructive preparation for a spawned child on Windows (there
+// is no fork()). The supervisor already did the destructive setup (migration,
+// stale-cache removal, seeding) before spawning, so a child must NOT removeTree
+// or migrate anything: siblings start at the same time and are already using
+// <data>/cache and <data>/entities/ the moment this child is born. Removing the
+// cache subtree here would race those siblings (the entity-server's 0xC0000409
+// crash on the first Windows runs was the cache dir being recreated out from
+// under it), so a child only arms its PathUtils global and idempotently ensures
+// the leaf directories exist.
+bool setupAppletDataDir(const std::string& dataDir) {
+    if (!makeDirs(dataDir)) {
+        return false;
+    }
+    if (!seedDefaultWorld(dataDir)) {
+        return false;
+    }
+    PathUtils::setAppDataDir(QString::fromUtf8(dataDir.c_str()));
     makeDirs(dataDir + "/cache");
     makeDirs(dataDir + "/cache/data");
     makeDirs(dataDir + "/cache/config");
@@ -974,7 +1014,10 @@ int main(int argc, char* argv[]) {
             // applet token; fall back to the default portable directory.
             dataDir = getDataDir();
         }
-        if (!setupDataDir(dataDir)) {
+        // A spawned child arrives while its siblings are already starting, so
+        // use the non-destructive setup: the supervisor (or a prior bare-token
+        // run) already migrated/removed-cache/seeded the dir.
+        if (!setupAppletDataDir(dataDir)) {
             std::fprintf(stderr, "overte-server: cannot prepare data dir %s\n", dataDir.c_str());
             return 1;
         }
