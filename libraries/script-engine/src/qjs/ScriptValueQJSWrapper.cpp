@@ -66,6 +66,7 @@ ScriptEnginePointer ScriptValueQJSWrapper::engine() const {
 }
 
 ScriptValue ScriptValueQJSWrapper::call(const ScriptValue& thisObject, const ScriptValueList& args) {
+    _engine->refreshStackTop();
     JSContext* ctx = _engine->context();
     JSValueConst thisVal;
     if (ScriptValueQJSWrapper* unwrappedThis = unwrap(thisObject)) {
@@ -107,6 +108,7 @@ ScriptValue ScriptValueQJSWrapper::call(const ScriptValue& thisObject, const Scr
 }
 
 ScriptValue ScriptValueQJSWrapper::construct(const ScriptValueList& args) {
+    _engine->refreshStackTop();
     JSContext* ctx = _engine->context();
     if (!JS_IsFunction(ctx, value())) {
         qCWarning(scriptengine_qjs) << "ScriptValueQJSWrapper::construct: value is not a function";

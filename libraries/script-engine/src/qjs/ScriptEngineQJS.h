@@ -138,6 +138,12 @@ public:
     JSRuntime* runtime() const { return _engineHandle->runtime(); }
     qjs::QjsEngineHandlePointer engineHandle() const { return _engineHandle; }
 
+    /// Re-anchors QuickJS's C-stack baseline to this thread before JS entry.
+    /// The runtime is created on the assignment thread but evaluated on the
+    /// script manager thread; without re-anchoring, QuickJS would compare two
+    /// unrelated thread stacks and spuriously report "stack overflow".
+    void refreshStackTop() { _engineHandle->refreshStackTop(); }
+
     /// Wraps an owned JSValue into a ScriptValue.
     ScriptValue toScriptValue(JSValue value);
     /// Wraps an owned value handle into a ScriptValue.

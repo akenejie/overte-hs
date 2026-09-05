@@ -81,6 +81,7 @@ bool ScriptProgramQJS::compile() {
         return true;
     }
     JSContext* ctx = _engineHandle->context();
+    _engineHandle->refreshStackTop();
     QByteArray sourceUtf8 = _sourceCode.toUtf8();
     QByteArray fileUtf8 = _fileName.toUtf8();
     JSValue result = JS_Eval(ctx, sourceUtf8.constData(), static_cast<size_t>(sourceUtf8.length()),

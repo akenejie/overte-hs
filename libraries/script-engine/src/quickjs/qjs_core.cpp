@@ -130,7 +130,8 @@ JS_BOOL JS_Equals(JSContext* ctx, JSValueConst op1, JSValueConst op2) {
 namespace qjs {
 
 static void externalDataFinalizer(JSRuntime* runtime, JSValue obj) {
-    void* opaque = JS_GetAnyOpaque(obj, nullptr);
+    JSClassID unusedClassId;
+    void* opaque = JS_GetAnyOpaque(obj, &unusedClassId);
     if (!opaque) {
         return;
     }
@@ -209,6 +210,10 @@ void QjsEngineHandle::setEvaluating(bool evaluating) {
 
 void QjsEngineHandle::runGC() {
     JS_RunGC(_runtime);
+}
+
+void QjsEngineHandle::refreshStackTop() {
+    JS_UpdateStackTop(_runtime);
 }
 
 JSMemoryUsage QjsEngineHandle::memoryUsage() const {

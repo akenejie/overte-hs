@@ -168,6 +168,7 @@ ScriptContext* ScriptEngineQJS::currentContext() const {
 }
 
 ScriptValue ScriptEngineQJS::evaluate(const QString& program, const QString& fileName) {
+    refreshStackTop();
     JSContext* ctx = context();
     QString effectiveFileName = fileName.isEmpty() ? "<anonymous>" : fileName;
     beginEvaluation();
@@ -190,6 +191,7 @@ ScriptValue ScriptEngineQJS::evaluate(const ScriptProgramPointer& program) {
     }
     JSContext* ctx = context();
     QString fileName = scriptProgram->fileName().isEmpty() ? "<anonymous>" : scriptProgram->fileName();
+    refreshStackTop();
     beginEvaluation();
     _currentScriptURLs.push_back(fileName);
     QByteArray sourceBytes = scriptProgram->sourceCode().toUtf8();
@@ -214,6 +216,7 @@ ScriptValue ScriptEngineQJS::evaluateInClosure(const ScriptValue& locals, const 
         thisVal = localsUnwrapped->value();
     }
     QString fileName = scriptProgram->fileName().isEmpty() ? "<anonymous>" : scriptProgram->fileName();
+    refreshStackTop();
     beginEvaluation();
     _currentScriptURLs.push_back(fileName);
     QByteArray sourceBytes = scriptProgram->sourceCode().toUtf8();

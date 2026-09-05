@@ -77,6 +77,15 @@ public:
 
     void runGC();
 
+    /// Re-anchors the C stack baseline used by the QuickJS stack-overflow check
+    /// to the current thread's position. The runtime may be created on one thread
+    /// and used on another, so QuickJS's default baseline (captured at
+    /// JS_NewRuntime) is meaningless once evaluation crosses threads and the
+    /// check spuriously reports "stack overflow". Call this before every
+    /// top-level entry into the JS engine so only genuine >max-stack-size C
+    /// recursion (not thread identity) can trip the check.
+    void refreshStackTop();
+
     JSMemoryUsage memoryUsage() const;
 
     /// Returns true if the last evaluation was aborted by the interrupt handler.

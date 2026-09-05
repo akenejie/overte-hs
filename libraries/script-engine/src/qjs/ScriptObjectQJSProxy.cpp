@@ -606,7 +606,8 @@ QObject* ScriptObjectQJSProxy::unwrap(JSContext* ctx, JSValueConst value) {
 
 void ScriptObjectQJSProxy::finalizeSignalHandle(JSRuntime* rt, JSValue val) {
     Q_UNUSED(rt);
-    void* opaque = qjs::JS_GetAnyOpaque(val, nullptr);
+    JSClassID unusedClassId;
+    void* opaque = qjs::JS_GetAnyOpaque(val, &unusedClassId);
     if (!opaque) {
         return;
     }
@@ -615,7 +616,8 @@ void ScriptObjectQJSProxy::finalizeSignalHandle(JSRuntime* rt, JSValue val) {
 
 void ScriptObjectQJSProxy::finalizer(JSRuntime* rt, JSValue val) {
     Q_UNUSED(rt);
-    void* opaque = qjs::JS_GetAnyOpaque(val, nullptr);
+    JSClassID unusedClassId;
+    void* opaque = qjs::JS_GetAnyOpaque(val, &unusedClassId);
     if (!opaque) {
         return;
     }
@@ -715,6 +717,7 @@ int QjsSignalSlot::qt_metacall(QMetaObject::Call call, int id, void** args) {
     }
 
     JSContext* ctx = _engine->context();
+    _engine->refreshStackTop();
     for (const qjs::QjsValueHandlePointer& callback : _callbacks) {
         if (!callback) {
             continue;
