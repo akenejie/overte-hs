@@ -9,6 +9,12 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+//
+// overte-hs modifications:
+// Copyright (C) 2026 アケネＪ / Akenejie
+// SPDX-License-Identifier: AGPL-3.0-only
+// (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 #ifndef overte_HelperScriptEngine_h
 #define overte_HelperScriptEngine_h
 

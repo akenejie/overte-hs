@@ -14,6 +14,12 @@
 // TODO: How will we handle collision callbacks with Entities
 //
 
+//
+// overte-hs modifications:
+// Copyright (C) 2026 アケネＪ / Akenejie
+// SPDX-License-Identifier: AGPL-3.0-only
+// (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 #ifndef hifi_EntityScriptingInterface_h
 #define hifi_EntityScriptingInterface_h
 

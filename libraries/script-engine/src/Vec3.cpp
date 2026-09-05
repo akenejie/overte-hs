@@ -11,6 +11,12 @@
 //  SPDX-License-Identifier: Apache-2.0
 //
 
+//
+// overte-hs modifications:
+// Copyright (C) 2026 アケネＪ / Akenejie
+// SPDX-License-Identifier: AGPL-3.0-only
+// (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 #include "Vec3.h"
 
 #include <glm/gtx/vector_angle.hpp>
@@ -99,4 +105,3 @@ glm::vec3 Vec3::fromPolar(float elevation, float azimuth) {
 float Vec3::getAngle(const glm::vec3& v1, const glm::vec3& v2) {
     return glm::acos(glm::dot(glm::normalize(v1), glm::normalize(v2)));
 }
-

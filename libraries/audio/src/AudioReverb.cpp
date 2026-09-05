@@ -7,6 +7,12 @@
 //  Copyright 2026 Overte e.V.
 //
 
+//
+// overte-hs modifications:
+// Copyright (C) 2026 アケネＪ / Akenejie
+// SPDX-License-Identifier: AGPL-3.0-only
+// (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 #include "AudioReverb.h"
 
 #include <cmath>

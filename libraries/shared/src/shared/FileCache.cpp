@@ -9,6 +9,12 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+//
+// overte-hs modifications:
+// Copyright (C) 2026 アケネＪ / Akenejie
+// SPDX-License-Identifier: AGPL-3.0-only
+// (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 #include "FileCache.h"
 
 
@@ -360,4 +366,3 @@ void File::touch() {
     utime(_filepath.c_str(), nullptr);
     _modified = std::max<int64_t>(QFileInfo(_filepath.c_str()).lastRead().toMSecsSinceEpoch(), _modified);
 }
-

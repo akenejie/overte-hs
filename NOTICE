@@ -1,0 +1,52 @@
+Overte Headless-Server (Unofficial)
+===================================
+
+This program is an unofficial, stripped-down derivative of Overte, reduced
+to a headless, portable, single-binary server. The modifications made for
+this fork are distributed under the GNU Affero General Public License,
+Version 3. See the "LICENSE-AGPL-3.0.txt" file or
+https://www.gnu.org/licenses/agpl-3.0.en.html for the full text.
+
+Repository: overte-hs
+
+Origin
+------
+"Overte" is copyright (C) by High Fidelity, Inc., the Vircadia
+contributors, Overte e.V. and the respective contributors. Overte is
+licensed under the Apache License, Version 2.0 ("License"; see the
+"LICENSE" file in this repository).
+
+This project is a modified version of Overte. Unmodified upstream code
+remains under the Apache License, Version 2.0. Only the modifications
+described below are licensed under the GNU Affero General Public License
+v3.0.
+
+See the upstream project: https://github.com/overte-org/overte
+
+Modifications / Headless rework
+-------------------------------
+The headless modifications (single-binary multicall server, removal of the
+client / GUI, rendering and baking subsystems, removal of the ICE and
+centralized-registry dependencies, port-argument based configuration
+instead of machine-specific paths, static embedding of the Opus codec, and
+the removal of other unused code paths) are:
+
+    Copyright (C) 2026 アケネＪ / Akenejie
+
+These modifications are licensed under the GNU Affero General Public
+License v3.0, see "LICENSE-AGPL-3.0.txt".
+
+Note per AGPL-3.0 section 13
+----------------------------
+This software is intended to operate as a network server (it listens on
+UDP/TCP ports). As required by section 13 of the AGPL-3.0, if this software
+is made available to other users over a network, the Corresponding Source
+of the complete, modified work must likewise be made available to those
+users. The primary source of this modified work is this repository
+(https://github.com/akenejie/overte-hs).
+
+Third-party components
+----------------------
+The embedded QuickJS interpreter under libraries/script-engine/src/quickjs
+and the QJS scripting bindings under libraries/script-engine/src/qjs are
+imported from their upstream projects and retain their own licenses.

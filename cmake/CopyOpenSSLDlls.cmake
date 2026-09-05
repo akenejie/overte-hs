@@ -16,6 +16,12 @@
 #    CONANLIB_DIR  – absolute path to conanlibs/<config>/
 #    DEST_DIR      – absolute path to the target's output directory
 
+#
+# overte-hs modifications:
+# Copyright (C) 2026 アケネＪ / Akenejie
+# SPDX-License-Identifier: AGPL-3.0-only
+# (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 if (NOT CONANLIB_DIR OR NOT DEST_DIR)
     message(FATAL_ERROR "CopyOpenSSLDlls.cmake: CONANLIB_DIR and DEST_DIR must be set")
 endif ()

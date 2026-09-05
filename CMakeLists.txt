@@ -7,6 +7,13 @@
 # both as a guide and as a reference manual. https://crascit.com/professional-cmake/
 
 # This should allow using long paths on Windows
+
+#
+# overte-hs modifications:
+# Copyright (C) 2026 アケネＪ / Akenejie
+# SPDX-License-Identifier: AGPL-3.0-only
+# (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 SET(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE INTERNAL "")
 # 3.24 is the minimum version that supports CMAKE_COMPILE_WARNING_AS_ERROR
 cmake_minimum_required(VERSION 3.24)

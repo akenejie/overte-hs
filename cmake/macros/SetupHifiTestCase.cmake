@@ -42,6 +42,12 @@
 # All other testing infrastructure is generated automatically.
 #
 
+#
+# overte-hs modifications:
+# Copyright (C) 2026 アケネＪ / Akenejie
+# SPDX-License-Identifier: AGPL-3.0-only
+# (Full AGPL text in LICENSE-AGPL-3.0.txt; see NOTICE in the repository root)
+
 macro(SETUP_HIFI_TESTCASE)
   if (NOT DEFINED TEST_PROJ_NAME)
     message(SEND_ERROR "Missing TEST_PROJ_NAME (setup_hifi_testcase was called incorrectly?)")
