@@ -50,6 +50,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#include <dbghelp.h>
 #include <direct.h>
 #else
 #include <sys/types.h>
@@ -1012,9 +1013,159 @@ int flagSupervisor(int argc, char* argv[]) {
     return result;
 }
 
+#if defined(_WIN32)
+// ---------------------------------------------------------------------------
+// Windows crash diagnostic
+//
+// 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN, an MSVC /GS canary failure or an
+// explicit __fastfail) and friends terminate a headless child with no console
+// message, leaving the supervisor's "exited unexpectedly (code ...)" line as
+// the only hint. This first-chance vectored exception handler records the
+// offending thread's stack - module + RVA, plus a symbol name when a .pdb
+// lies beside the exe - to <data>/crashdbg.log, then returns
+// EXCEPTION_CONTINUE_SEARCH so the OS performs its normal crash handling. It
+// never swallows the exception, so process behavior is unchanged.
+LONG WINAPI crashDiagnosticFilter(EXCEPTION_POINTERS* ep) {
+    const DWORD code = ep->ExceptionRecord->ExceptionCode;
+    switch (code) {
+        case 0xC0000005: // ACCESS_VIOLATION
+        case 0xC00000FD: // STACK_OVERFLOW
+        case 0xC0000374: // HEAP_CORRUPTION
+        case 0xC0000409: // STACK_BUFFER_OVERRUN / fail-fast
+            break;
+        default:
+            return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    FILE* file = nullptr;
+    {
+        const QString dataDir = PathUtils::appDataDir();
+        const std::string path = (dataDir.isEmpty() ? QStringLiteral("crashdbg.log")
+                                                    : dataDir + QStringLiteral("/crashdbg.log"))
+                                     .toLocal8Bit()
+                                     .toStdString();
+        file = fopen(path.c_str(), "a");
+    }
+    if (!file) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    std::fprintf(file, "\n[CRASH-DBG] Windows exception 0x%08lX, thread %lu, address %p\n",
+                 (unsigned long)code, (unsigned long)GetCurrentThreadId(), ep->ExceptionRecord->ExceptionAddress);
+    std::fflush(file);
+
+    const HANDLE process = GetCurrentProcess();
+    const HANDLE thread = GetCurrentThread();
+    HMODULE dbghelp = LoadLibraryA("dbghelp.dll");
+    if (dbghelp) {
+        typedef BOOL(WINAPI* StackWalk64_t)(DWORD, HANDLE, HANDLE, LPSTACKFRAME64, PVOID*,
+                                            PREAD_PROCESS_MEMORY_ROUTINE64, PFUNCTION_TABLE_ACCESS_ROUTINE64,
+                                            PGET_MODULE_BASE_ROUTINE64, PTRANSLATE_ADDRESS_ROUTINE64);
+        typedef DWORD(WINAPI* SymGetOptions_t)(void);
+        typedef DWORD(WINAPI* SymSetOptions_t)(DWORD);
+        typedef BOOL(WINAPI* SymInitializeW_t)(HANDLE, PCWSTR, BOOL);
+        typedef BOOL(WINAPI* SymCleanup_t)(HANDLE);
+        typedef BOOL(WINAPI* SymFromAddr_t)(HANDLE, DWORD64, PDWORD64, PSYMBOL_INFO);
+        typedef PVOID(WINAPI* SymFunctionTableAccess64_t)(HANDLE, DWORD64);
+        typedef DWORD64(WINAPI* SymGetModuleBase64_t)(HANDLE, DWORD64);
+
+        const auto stackWalk = (StackWalk64_t)GetProcAddress(dbghelp, "StackWalk64");
+        const auto symFromAddr = (SymFromAddr_t)GetProcAddress(dbghelp, "SymFromAddr");
+        const auto symGetOptions = (SymGetOptions_t)GetProcAddress(dbghelp, "SymGetOptions");
+        const auto symSetOptions = (SymSetOptions_t)GetProcAddress(dbghelp, "SymSetOptions");
+        const auto symInitialize = (SymInitializeW_t)GetProcAddress(dbghelp, "SymInitializeW");
+        const auto symCleanup = (SymCleanup_t)GetProcAddress(dbghelp, "SymCleanup");
+        const auto functionTableAccess = (SymFunctionTableAccess64_t)GetProcAddress(dbghelp, "SymFunctionTableAccess64");
+        const auto getModuleBase = (SymGetModuleBase64_t)GetProcAddress(dbghelp, "SymGetModuleBase64");
+
+        if (stackWalk && symFromAddr && symGetOptions && symSetOptions && symInitialize && symCleanup
+            && functionTableAccess && getModuleBase) {
+            // Best-effort symbolization (needs the matching .pdb next to the exe);
+            // the module+RVA below is always logged and is enough to locate the
+            // crash in the release binary.
+            symSetOptions(symGetOptions() | SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES);
+            symInitialize(process, nullptr, FALSE);
+
+            CONTEXT context = *ep->ContextRecord;
+            STACKFRAME64 frame;
+            ZeroMemory(&frame, sizeof(frame));
+#if defined(_M_X64) || defined(__x86_64__)
+            frame.AddrPC.Offset = context.Rip;
+            frame.AddrFrame.Offset = context.Rbp;
+            frame.AddrStack.Offset = context.Rsp;
+            const DWORD machineType = IMAGE_FILE_MACHINE_AMD64;
+#elif defined(_M_IX86) || defined(__i386__)
+            frame.AddrPC.Offset = context.Eip;
+            frame.AddrFrame.Offset = context.Ebp;
+            frame.AddrStack.Offset = context.Esp;
+            const DWORD machineType = IMAGE_FILE_MACHINE_I386;
+#elif defined(_M_ARM64)
+            frame.AddrPC.Offset = context.Pc;
+            frame.AddrFrame.Offset = context.Fp;
+            frame.AddrStack.Offset = context.Sp;
+            const DWORD machineType = IMAGE_FILE_MACHINE_ARM64;
+#else
+            const DWORD machineType = IMAGE_FILE_MACHINE_UNKNOWN;
+#endif
+            frame.AddrPC.Mode = AddrModeFlat;
+            frame.AddrFrame.Mode = AddrModeFlat;
+            frame.AddrStack.Mode = AddrModeFlat;
+
+            const DWORD symbolBufferSize = sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR);
+            std::vector<unsigned char> symbolBuffer(symbolBufferSize);
+            PSYMBOL_INFO symbol = reinterpret_cast<PSYMBOL_INFO>(symbolBuffer.data());
+            symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+            symbol->MaxNameLen = MAX_SYM_NAME;
+
+            int frameIndex = 0;
+            for (int i = 0; i < 128; ++i) {
+                if (!stackWalk(machineType, process, thread, &frame, &context, nullptr,
+                               functionTableAccess, getModuleBase, nullptr)) {
+                    break;
+                }
+                if (frame.AddrPC.Offset == 0 || frame.AddrFrame.Offset == 0) {
+                    break;
+                }
+
+                DWORD64 displacement = 0;
+                std::string symbolName;
+                if (symFromAddr(process, frame.AddrPC.Offset, &displacement, symbol)) {
+                    symbolName = symbol->Name;
+                }
+                std::string moduleName;
+                const DWORD64 moduleBase = getModuleBase(process, frame.AddrPC.Offset);
+                if (moduleBase != 0) {
+                    char modulePath[MAX_PATH] = { 0 };
+                    if (GetModuleFileNameA(reinterpret_cast<HMODULE>((uintptr_t)moduleBase), modulePath, MAX_PATH) > 0) {
+                        const std::string path(modulePath);
+                        const size_t slash = path.find_last_of("\\");
+                        moduleName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+                    }
+                }
+
+                std::fprintf(file, "\t[#%02d] %s+0x%llX %s\n", frameIndex++, moduleName.c_str(),
+                             (unsigned long long)displacement, symbolName.empty() ? "<no symbol>" : symbolName.c_str());
+                std::fflush(file);
+            }
+            symCleanup(process);
+        }
+    }
+
+    std::fclose(file);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+
 } // namespace
 
 int main(int argc, char* argv[]) {
+#if defined(_WIN32)
+    // Register the crash diagnostic before anything else so that both the
+    // supervisor and every spawned applet child (including children that die
+    // before they reach their applet entry point) log their crash stack.
+    AddVectoredExceptionHandler(1, crashDiagnosticFilter);
+#endif
+
     if (argc < 2) {
         printUsage(argv[0]);
         return 1;

@@ -128,6 +128,11 @@ if (UNIX)
   target_link_libraries(${TARGET_NAME} ${CMAKE_DL_LIBS})
 endif ()
 
+# Windows crash-diagnostic stack walker (backstop in main.cpp)
+if (WIN32)
+  target_link_libraries(${TARGET_NAME} dbghelp)
+endif ()
+
 target_link_libraries(${TARGET_NAME} ${CMAKE_THREAD_LIBS_INIT})
 
 add_crashpad()
