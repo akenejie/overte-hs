@@ -1235,7 +1235,7 @@ static void abortCaptureFilter(int sig) {
                                                   dumpFlags, nullptr, nullptr, nullptr);
                 CloseHandle(dumpFile);
                 if (file) {
-                    std::fprintf(file, "\t[CRASH-DBG] full minidump %s: %s\n", dumpPath.c_str(),
+                    std::fprintf(file, "\t[CRASH-DBG] full minidump %s: %s\n", dumpPath,
                                  ok ? "OK" : "FAILED");
                     std::fflush(file);
                 }
