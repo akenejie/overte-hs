@@ -1119,7 +1119,8 @@ LONG WINAPI crashDiagnosticFilter(EXCEPTION_POINTERS* ep) {
 
             int frameIndex = 0;
             for (int i = 0; i < 128; ++i) {
-                if (!stackWalk(machineType, process, thread, &frame, &context, nullptr,
+                if (!stackWalk(machineType, process, thread, &frame,
+                               reinterpret_cast<PVOID*>(&context), nullptr,
                                functionTableAccess, getModuleBase, nullptr)) {
                     break;
                 }
