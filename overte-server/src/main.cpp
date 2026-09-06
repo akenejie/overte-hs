@@ -1054,6 +1054,43 @@ LONG WINAPI crashDiagnosticFilter(EXCEPTION_POINTERS* ep) {
                  (unsigned long)code, (unsigned long)GetCurrentThreadId(), ep->ExceptionRecord->ExceptionAddress);
     std::fflush(file);
 
+    // Full-memory minidump (HIFI_FULLDUMP=1). Reusing the already-loaded
+    // dbghelp.dll avoids adding a link-time dependency only used on this path.
+    if (getenv("HIFI_FULLDUMP")) {
+        HMODULE dumpDll = LoadLibraryA("dbghelp.dll");
+        if (dumpDll) {
+            typedef BOOL(WINAPI* MiniDumpWriteDump_t)(HANDLE, DWORD, HANDLE, DWORD, PMINIDUMP_EXCEPTION_INFORMATION,
+                                                      PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
+            const auto miniDumpWriteDump = (MiniDumpWriteDump_t)GetProcAddress(dumpDll, "MiniDumpWriteDump");
+            if (miniDumpWriteDump) {
+                const QString dumpDataDir = PathUtils::appDataDir();
+                const std::string dumpPath = (dumpDataDir.isEmpty() ? QStringLiteral("crashdbg.dmp")
+                                                                    : dumpDataDir + QStringLiteral("/crashdbg.dmp"))
+                                                 .toLocal8Bit()
+                                                 .toStdString();
+                const HANDLE dumpFile = CreateFileA(dumpPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                                    FILE_ATTRIBUTE_NORMAL, nullptr);
+                if (dumpFile != INVALID_HANDLE_VALUE) {
+                    MINIDUMP_EXCEPTION_INFORMATION ei;
+                    ei.ThreadId = GetCurrentThreadId();
+                    ei.ExceptionPointers = ep;
+                    ei.ClientPointers = FALSE;
+                    const DWORD dumpFlags = 0x00000002 // MiniDumpWithFullMemory
+                        | 0x00000008 // MiniDumpWithHandleData
+                        | 0x00000040 // MiniDumpWithUnloadedModules
+                        | 0x00000100 // MiniDumpWithThreadInfo
+                        | 0x00001000; // MiniDumpWithProcessThreadData
+                    const BOOL ok = miniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dumpFile,
+                                                      dumpFlags, &ei, nullptr, nullptr);
+                    CloseHandle(dumpFile);
+                    std::fprintf(file, "\t[CRASH-DBG] full minidump %s: %s\n", dumpPath.c_str(),
+                                 ok ? "OK" : "FAILED");
+                    std::fflush(file);
+                }
+            }
+        }
+    }
+
     const HANDLE process = GetCurrentProcess();
     const HANDLE thread = GetCurrentThread();
     HMODULE dbghelp = LoadLibraryA("dbghelp.dll");
