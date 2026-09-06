@@ -2949,13 +2949,19 @@ bool EntityTree::writeToJSON(QString& jsonString, const OctreeElementPointer& el
     entityDbg("writeToJSON: start, about to run in helperScriptEngine...");
     _helperScriptEngine.run( [&] {
         entityDbg("writeToJSON: inside lambda, creating RecurseOctreeToJSONOperator...");
-        RecurseOctreeToJSONOperator theOperator(element, _helperScriptEngine.get(), jsonString);
-        entityDbg("writeToJSON: operator created, calling recurseTreeWithOperator...");
-        withReadLock([&] { recurseTreeWithOperator(&theOperator); });
-        entityDbg("writeToJSON: recursion done, getting json...");
+        try {
+            RecurseOctreeToJSONOperator theOperator(element, _helperScriptEngine.get(), jsonString);
+            entityDbg("writeToJSON: operator created, calling recurseTreeWithOperator...");
+            withReadLock([&] { recurseTreeWithOperator(&theOperator); });
+            entityDbg("writeToJSON: recursion done, getting json...");
 
-        jsonString = theOperator.getJson();
-        entityDbg("writeToJSON: json copied");
+            jsonString = theOperator.getJson();
+            entityDbg("writeToJSON: json copied");
+        } catch (const std::exception& ex) {
+            entityDbg((QStringLiteral("writeToJSON EXCEPTION what=%1").arg(QString::fromUtf8(ex.what()))).toUtf8().constData());
+        } catch (...) {
+            entityDbg("writeToJSON EXCEPTION-UNKNOWN");
+        }
     });
     entityDbg("writeToJSON: done");
     return true;

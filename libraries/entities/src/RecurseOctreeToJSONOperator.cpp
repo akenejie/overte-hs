@@ -26,6 +26,20 @@
 #include <QJsonArray>
 #include <QJsonValue>
 
+#include <cstdio>
+#include <exception>
+
+static void processEntityDbg(const char* msg) {
+    static FILE* file = nullptr;
+    if (!file) {
+        file = fopen("crashdbg.log", "a");
+    }
+    if (file) {
+        fprintf(file, "[CRASH-DBG] processEntity: %s\n", msg);
+        fflush(file);
+    }
+}
+
 RecurseOctreeToJSONOperator::RecurseOctreeToJSONOperator(const OctreeElementPointer&, ScriptEngine* engine,
     QString jsonPrefix, bool skipDefaults, bool skipThoseWithBadParents):
     _engine(engine),
@@ -52,10 +66,25 @@ void RecurseOctreeToJSONOperator::processEntity(const EntityItemPointer& entity)
 
     QVariantMap propertiesMap;
     {
-        ScriptValue qScriptValues = _skipDefaults
-            ? EntityItemNonDefaultPropertiesToScriptValue(_engine, entity->getProperties())
-            : EntityItemPropertiesToScriptValue(_engine, entity->getProperties());
-        propertiesMap = qScriptValues.toVariant().toMap();
+        const QString id = entity->getID().toString();
+        const QString typeName = EntityTypes::getEntityTypeName(entity->getType());
+        processEntityDbg((QStringLiteral("start id=%1 type=%2").arg(id, typeName)).toUtf8().constData());
+        try {
+            ScriptValue qScriptValues = _skipDefaults
+                ? EntityItemNonDefaultPropertiesToScriptValue(_engine, entity->getProperties())
+                : EntityItemPropertiesToScriptValue(_engine, entity->getProperties());
+            processEntityDbg("properties converted");
+            propertiesMap = qScriptValues.toVariant().toMap();
+            processEntityDbg("variant map built");
+        } catch (const std::exception& ex) {
+            processEntityDbg((QStringLiteral("EXCEPTION id=%1 type=%2 what=%3")
+                                  .arg(id, typeName, QString::fromUtf8(ex.what())))
+                                 .toUtf8().constData());
+        } catch (...) {
+            processEntityDbg((QStringLiteral("EXCEPTION-UNKNOWN id=%1 type=%2")
+                                  .arg(id, typeName))
+                                 .toUtf8().constData());
+        }
     }
 
     if (_comma) {
