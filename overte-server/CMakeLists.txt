@@ -20,19 +20,26 @@ set(TARGET_NAME overte-server)
 
 project(${TARGET_NAME})
 
-# Embed the default empty world (default-data/entities/models.json.gz) as a C
-# byte array so a freshly created --data dir can be seeded at first run
-# without any runtime data files or Qt resource dependency.
+# Embed the default room (default-data/entities/models.json.gz and the
+# asset-server content it references: default-data/assets/files/* +
+# default-data/assets/map.json) as C byte arrays so a freshly created --data
+# dir can be seeded at first run without any runtime data files or Qt resource
+# dependency.
 set(DEFAULT_DATA_HPP "${CMAKE_BINARY_DIR}/includes/default_data.hpp")
+file(GLOB DEFAULT_DATA_ASSET_FILES "${CMAKE_SOURCE_DIR}/default-data/assets/files/*")
 add_custom_command(
   OUTPUT "${DEFAULT_DATA_HPP}"
   COMMAND ${CMAKE_COMMAND}
-          -DSRC=${CMAKE_SOURCE_DIR}/default-data/entities/models.json.gz
+          -DENTITY_SRC=${CMAKE_SOURCE_DIR}/default-data/entities/models.json.gz
+          -DMAP_SRC=${CMAKE_SOURCE_DIR}/default-data/assets/map.json
+          -DFILES_DIR=${CMAKE_SOURCE_DIR}/default-data/assets/files
           -DOUT=${DEFAULT_DATA_HPP}
           -P ${CMAKE_SOURCE_DIR}/cmake/GenerateDefaultData.cmake
   DEPENDS "${CMAKE_SOURCE_DIR}/default-data/entities/models.json.gz"
+          "${CMAKE_SOURCE_DIR}/default-data/assets/map.json"
+          ${DEFAULT_DATA_ASSET_FILES}
           "${CMAKE_SOURCE_DIR}/cmake/GenerateDefaultData.cmake"
-  COMMENT "Generating ${DEFAULT_DATA_HPP} (embedded default empty world)"
+  COMMENT "Generating ${DEFAULT_DATA_HPP} (embedded default room)"
   VERBATIM
 )
 add_custom_target(overte_server_default_data DEPENDS "${DEFAULT_DATA_HPP}")

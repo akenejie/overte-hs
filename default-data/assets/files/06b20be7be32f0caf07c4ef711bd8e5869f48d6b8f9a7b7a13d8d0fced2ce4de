@@ -1,0 +1,3 @@
+filename = builder-grid.baked.fbx
+materialMap = [{"mat::Mat.builder-grid":"builder-grid.baked.json#Mat.builder-grid"},{"mat::Mat.builder-post":"builder-grid.baked.json#Mat.builder-post"}]
+version = 1

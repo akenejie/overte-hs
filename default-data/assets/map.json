@@ -1,0 +1,19 @@
+{
+    "/.baked/4e313cdbb499e334b6f3c205f57d209558147e31b021a374c1fa62c9f440831a/meta.json": "ca9e0f0c423c48f031677641bc80b319e2ed372cd0dd6f4bba82adc5bb5cd1d4",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/builder-grid.baked.fbx": "0aa6c79799740a5ba43e873cf799ed26ec37f9355d87b2a60708a52de2c41ee8",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/builder-grid.baked.fst": "06b20be7be32f0caf07c4ef711bd8e5869f48d6b8f9a7b7a13d8d0fced2ce4de",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/builder-grid.baked.json": "713f4092db36adae7896f9d4e653bbecdc0223b934356712e78371a914fba746",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/Builder-Grid-post-01_2.png": "0e0e05b350763ce431209bdf2c8c12ecd09c6197d3782f6c2ddc674671b60a73",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/Builder-Grid-post-01_2_COMPRESSED_SRGB_S3TC_DXT1_EXT.ktx": "213c17f71551f7c27d3db935f50386f2ce13b43a44cd450aaf18ece0b1465937",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-01_2.png": "519bc091f7401c0f5dd852845f2f59cfe66f07c9972e46a2e969d4430946e7d1",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-01_2.texmeta.json": "0177df3e74a80d095c4d2417b5471be2ef0f5def9ec579d3401911d945d1dad8",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-01_2_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC.ktx": "6536e57c41100b08b08876077f2d1a7a7277a2134558902b2617b8efe6dd38b2",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-01_2_COMPRESSED_SRGB_S3TC_DXT1_EXT.ktx": "ef36b67737e70cc4487827165108aef35442b8a5272c870ad65b78f039b1709e",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-hardness-01_7.png": "0f587aeecdee9459f6f9a54b4d3d0e06a20db18af95eb40f7f6796ecdfce0aef",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-hardness-01_7.texmeta.json": "2bba54be2aee8e5b3c86e7e070d6ce8d118188f740e17448f9c8966824bb5e1f",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-hardness-01_7_COMPRESSED_R11_EAC.ktx": "e60ce3b0cd12c054a28827e0ea771f45b59372a3808e26ce577b1879c98ba357",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/materialTextures/0/hifi-Builder-grid-hardness-01_7_COMPRESSED_RED_RGTC1.ktx": "0fe592349375fe4900c6e9c44bd8fc6670c8a497b8a4ee3ca7134321878fa925",
+    "/.baked/52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0/meta.json": "d0a64eb3dbef87d7b93d044483a294ffca3bb3fd26d8d644fff9ebcb7d7fa5e7",
+    "/1592e15e-c822-41aa-b314-4ef261e5d843-v1/builder-grid.fbx": "52e0b87bc9be3277b59c83f04d938d2a6a72729935ed486af8179382827f76d0",
+    "/skyboxes/Skybox-Sun-high.png": "4e313cdbb499e334b6f3c205f57d209558147e31b021a374c1fa62c9f440831a"
+}

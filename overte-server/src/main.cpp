@@ -37,8 +37,9 @@
 
 #include <PathUtils.h>
 
-// Byte array for the embedded default empty world, generated at build time by
-// cmake/GenerateDefaultData.cmake from default-data/entities/models.json.gz.
+// Byte arrays for the embedded default room (entity persist file + the asset
+// files and map the entities reference), generated at build time by
+// cmake/GenerateDefaultData.cmake from default-data/ (entities + assets).
 #include "default_data.hpp"
 
 // Release version as a C macro, generated at build time by
@@ -401,50 +402,79 @@ void migrateLegacyData(const std::string& dataDir) {
     removeTree(dataDir + "/config");
 }
 
-// Seed a freshly-created data dir with the embedded default empty world so a
-// first run starts as an empty-but-valid room instead of warning about a
-// missing entity persist file. The created-atomically and only-when-absent
-// rules make the call safe to run from every supervisor/applet process even
-// though they start at the same time, and existing user data is never touched.
-bool seedDefaultWorld(const std::string& dataDir) {
-    const std::string persistPath = dataDir + "/entities/models.json.gz";
+// Write <data> to <path> atomically and only if absent. Returns 0 on a fresh
+// write, 1 if the file already exists (another process won the race, or this
+// data dir was already seeded), and -1 on a genuine error.
+int seedFileIfAbsent(const std::string& path, const unsigned char* data, size_t size) {
+#if defined(_WIN32)
+    HANDLE h = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                           FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        return (GetLastError() == ERROR_FILE_EXISTS) ? 1 : -1;
+    }
+    DWORD written = 0;
+    const bool ok = WriteFile(h, data, (DWORD)size, &written, nullptr) && written == (DWORD)size;
+    CloseHandle(h);
+    return ok ? 0 : -1;
+#else
+    const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+    if (fd < 0) {
+        return (errno == EEXIST) ? 1 : -1;
+    }
+    const size_t written = ::write(fd, data, size);
+    const bool ok = (written == size) && (::close(fd) == 0);
+    return ok ? 0 : -1;
+#endif
+}
+
+// Seed a fresh data dir with the embedded default room: the entity persist
+// file (entities/models.json.gz) and the asset-server content it references
+// (assets/files/<sha256> + assets/map.json). Every file is written
+// create-if-absent, so the call is safe to run from every supervisor/applet
+// process even though they start at the same time, and existing user data is
+// never overwritten. A data dir that already holds entities but zero assets
+// (created by earlier releases that only embedded the world file) is silently
+// completed with the missing assets on the next boot.
+bool seedDefaultData(const std::string& dataDir) {
     if (!makeDirs(dataDir + "/entities")) {
         std::fprintf(stderr, "overte-server: cannot create %s/entities\n", dataDir.c_str());
         return false;
     }
-#if defined(_WIN32)
-    HANDLE h = CreateFileA(persistPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
-                           FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) {
-        if (GetLastError() == ERROR_FILE_EXISTS) {
-            return true; // another process already seeded it
-        }
-        std::fprintf(stderr, "overte-server: cannot seed %s\n", persistPath.c_str());
+    if (!makeDirs(dataDir + "/assets/files")) {
+        std::fprintf(stderr, "overte-server: cannot create %s/assets/files\n", dataDir.c_str());
         return false;
     }
-    DWORD written = 0;
-    const bool ok = WriteFile(h, gDefaultModelsJsonGz, (DWORD)gDefaultModelsJsonGzSize, &written, nullptr)
-                    && written == gDefaultModelsJsonGzSize;
-    CloseHandle(h);
-#else
-    const int fd = ::open(persistPath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
-    if (fd < 0) {
-        if (errno == EEXIST) {
-            return true; // another process already seeded it
-        }
-        std::fprintf(stderr, "overte-server: cannot seed %s\n", persistPath.c_str());
-        return false;
+
+    int seeded = 0;
+    bool failed = false;
+
+    switch (seedFileIfAbsent(dataDir + "/entities/models.json.gz", gDefaultModelsJsonGz, gDefaultModelsJsonGzSize)) {
+        case 0: ++seeded; break;
+        case -1: failed = true; break;
     }
-    const size_t written = ::write(fd, gDefaultModelsJsonGz, gDefaultModelsJsonGzSize);
-    const bool ok = (written == gDefaultModelsJsonGzSize) && (::close(fd) == 0);
-#endif
-    if (ok) {
-        std::printf("Seeded default empty world at %s\n", persistPath.c_str());
+
+    for (size_t i = 0; i < gDefaultAssetsCount; ++i) {
+        const DefaultDataAsset& asset = gDefaultAssets[i];
+        switch (seedFileIfAbsent(dataDir + "/assets/files/" + asset.fileName, asset.data, asset.size)) {
+            case 0: ++seeded; break;
+            case -1: failed = true; break;
+        }
+    }
+
+    switch (seedFileIfAbsent(dataDir + "/assets/map.json", gDefaultAssetMapJson, gDefaultAssetMapJsonSize)) {
+        case 0: ++seeded; break;
+        case -1: failed = true; break;
+    }
+
+    if (seeded > 0) {
+        std::printf("Seeded default room (%d new files, entities + %zu assets + map) at %s\n",
+                    seeded, gDefaultAssetsCount, dataDir.c_str());
         std::fflush(stdout); // don't let fork() children echo this line via inherited buffer
-    } else {
-        std::fprintf(stderr, "overte-server: failed to seed %s\n", persistPath.c_str());
     }
-    return ok;
+    if (failed) {
+        std::fprintf(stderr, "overte-server: failed to seed part of the default room at %s\n", dataDir.c_str());
+    }
+    return !failed;
 }
 
 // Prepare <dataDir> as the single writable root for a run: migrate old layouts,
@@ -457,7 +487,7 @@ bool setupDataDir(const std::string& dataDir) {
         return false;
     }
     migrateLegacyData(dataDir);
-    if (!seedDefaultWorld(dataDir)) {
+    if (!seedDefaultData(dataDir)) {
         return false;
     }
     removeTree(dataDir + "/cache");
@@ -486,7 +516,7 @@ bool setupAppletDataDir(const std::string& dataDir) {
     if (!makeDirs(dataDir)) {
         return false;
     }
-    if (!seedDefaultWorld(dataDir)) {
+    if (!seedDefaultData(dataDir)) {
         return false;
     }
     PathUtils::setAppDataDir(QString::fromUtf8(dataDir.c_str()));
