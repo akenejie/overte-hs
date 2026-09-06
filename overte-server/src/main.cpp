@@ -1192,6 +1192,64 @@ LONG WINAPI crashDiagnosticFilter(EXCEPTION_POINTERS* ep) {
     std::fclose(file);
     return EXCEPTION_CONTINUE_SEARCH;
 }
+
+// SIGABRT handler (HIFI_CAPTURE_ABORT=1). The UCRT abort() raises SIGABRT
+// first and only then performs __fastfail(FAST_FAIL_FATAL_APP_EXIT) - the
+// fast-fail itself bypasses every vectored exception handler, so the full-memory
+// dump can only be written from this signal handler, which runs in ordinary
+// execution context with the whole stack (abort's caller frames included) intact.
+static void abortCaptureFilter(int sig) {
+    FILE* file = nullptr;
+    {
+        const QString dataDir = PathUtils::appDataDir();
+        const std::string path = (dataDir.isEmpty() ? QStringLiteral("crashdbg.log")
+                                                    : dataDir + QStringLiteral("/crashdbg.log"))
+                                     .toLocal8Bit()
+                                     .toStdString();
+        file = fopen(path.c_str(), "a");
+    }
+    if (file) {
+        std::fprintf(file, "\n[CRASH-DBG] SIGABRT(%d) thread %lu, abort called from %p\n", sig,
+                     (unsigned long)GetCurrentThreadId(), _ReturnAddress());
+        std::fflush(file);
+    }
+
+    HMODULE dumpDll = LoadLibraryA("dbghelp.dll");
+    if (dumpDll) {
+        typedef BOOL(WINAPI* MiniDumpWriteDump_t)(HANDLE, DWORD, HANDLE, DWORD, PMINIDUMP_EXCEPTION_INFORMATION,
+                                                  PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
+        const auto miniDumpWriteDump = (MiniDumpWriteDump_t)GetProcAddress(dumpDll, "MiniDumpWriteDump");
+        if (miniDumpWriteDump) {
+            const QString dumpDataDir = PathUtils::appDataDir();
+            const std::string dumpPath = (dumpDataDir.isEmpty() ? QStringLiteral("crashdbg_abort.dmp")
+                                                                : dumpDataDir + QStringLiteral("/crashdbg_abort.dmp"))
+                                             .toLocal8Bit()
+                                             .toStdString();
+            const HANDLE dumpFile = CreateFileA(dumpPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                                FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (dumpFile != INVALID_HANDLE_VALUE) {
+                const DWORD dumpFlags = 0x00000002 // MiniDumpWithFullMemory
+                    | 0x00000008 // MiniDumpWithHandleData
+                    | 0x00000040 // MiniDumpWithUnloadedModules
+                    | 0x00000100 // MiniDumpWithThreadInfo
+                    | 0x00001000; // MiniDumpWithProcessThreadData
+                const BOOL ok = miniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dumpFile,
+                                                  dumpFlags, nullptr, nullptr, nullptr);
+                CloseHandle(dumpFile);
+                if (file) {
+                    std::fprintf(file, "\t[CRASH-DBG] full minidump %s: %s\n", dumpPath.c_str(),
+                                 ok ? "OK" : "FAILED");
+                    std::fflush(file);
+                }
+            }
+        }
+    }
+
+    if (file) {
+        std::fclose(file);
+    }
+    TerminateProcess(GetCurrentProcess(), 3);
+}
 #endif
 
 } // namespace
@@ -1202,6 +1260,11 @@ int main(int argc, char* argv[]) {
     // supervisor and every spawned applet child (including children that die
     // before they reach their applet entry point) log their crash stack.
     AddVectoredExceptionHandler(1, crashDiagnosticFilter);
+    // HIFI_CAPTURE_ABORT=1 arms the SIGABRT trap that writes a full-memory
+    // minidump at the abort() call site (fast-fails never reach the VEH).
+    if (getenv("HIFI_CAPTURE_ABORT")) {
+        signal(SIGABRT, abortCaptureFilter);
+    }
 #endif
 
     if (argc < 2) {

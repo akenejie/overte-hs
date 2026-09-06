@@ -204,13 +204,7 @@ bool qBytearrayFromScriptValue(const ScriptValue& object, QByteArray &qByteArray
 ScriptValue vec3ToScriptValue(ScriptEngine* engine, const glm::vec3& vec3) {
     auto prototype = engine->globalObject().property("__hifi_vec3__");
     if (!prototype.hasProperty("defined") || !prototype.property("defined").toBool()) {
-        // HIFI_TRIVIAL_BOOTSTRAP=1 reproduces the Windows 0xC0000409 crash
-        // hunt with a minimal script: if this trivial program aborts too, the
-        // fault is in the QuickJS/MSVC eval of any script; if it succeeds, the
-        // Object.defineProperties accessor literal is what trips codegen.
-        prototype = qEnvironmentVariableIsSet("HIFI_TRIVIAL_BOOTSTRAP") ? engine->evaluate(
-            "globalThis.__hifi_vec3__ = { defined: true };")
-            : engine->evaluate(
+        prototype = engine->evaluate(
             "globalThis.__hifi_vec3__ = Object.defineProperties({}, { "
             "defined: { value: true },"
             "0: { set: function(nv) { return this.x = nv; }, get: function() { return this.x; } },"
