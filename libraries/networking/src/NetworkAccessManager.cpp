@@ -16,14 +16,25 @@
 #include "AtpReply.h"
 #include <QtNetwork/QNetworkProxy>
 
-QThreadStorage<QNetworkAccessManager*> networkAccessManagers;
+// The per-thread QNetworkAccessManager must not be destroyed when its owning
+// thread finishes. QThreadStorage<QNetworkAccessManager*> owns the stored
+// object and deletes it on thread exit, which tears down any QSslSocket/QSslKey
+// backing it. On OpenSSL 3 that happens concurrently with the process-wide
+// OpenSSL cleanup and causes a nondeterministic double-free (SIGSEGV) during
+// shutdown. Store a small box instead whose destructor intentionally does not
+// destroy the manager, so the manager simply leaks until process teardown.
+struct NetworkAccessManagerBox {
+    QNetworkAccessManager* manager;
+};
+
+QThreadStorage<NetworkAccessManagerBox*> networkAccessManagers;
 
 QNetworkAccessManager& NetworkAccessManager::getInstance() {
     if (!networkAccessManagers.hasLocalData()) {
-        networkAccessManagers.setLocalData(new QNetworkAccessManager());
+        networkAccessManagers.setLocalData(new NetworkAccessManagerBox{ new QNetworkAccessManager() });
     }
-    
-    return *networkAccessManagers.localData();
+
+    return *networkAccessManagers.localData()->manager;
 }
 
 QNetworkReply* NetworkAccessManager::createRequest(Operation operation, const QNetworkRequest& request, QIODevice* device) {

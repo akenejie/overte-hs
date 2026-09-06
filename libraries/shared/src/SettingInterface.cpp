@@ -47,6 +47,12 @@ namespace Setting {
         auto globalManager = DependencyManager::get<Manager>();
         Q_ASSERT(qApp && globalManager);
 
+        // The writer thread must only start here: a Qt event dispatcher exists
+        // for it once QCoreApplication is being constructed. Starting it from
+        // the Manager constructor (before QCoreApplication exists) makes
+        // QThread::exec fail and the thread never processes queued writes.
+        globalManager->startWriterThread();
+
         qAddPostRoutine(cleanupSettingsSaveThread);
     }
 

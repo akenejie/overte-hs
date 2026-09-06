@@ -22,14 +22,21 @@
 #include "MetaverseAPI.h"
 #include "SharedUtil.h"
 
-QThreadStorage<OAuthNetworkAccessManager*> oauthNetworkAccessManagers;
+// See NetworkAccessManager.cpp: the manager must not be destroyed when its
+// owning thread finishes (OpenSSL 3 cleanup race -> double free), so the box
+// destructor intentionally does not destroy it.
+struct OAuthNetworkAccessManagerBox {
+    OAuthNetworkAccessManager* manager;
+};
+
+QThreadStorage<OAuthNetworkAccessManagerBox*> oauthNetworkAccessManagers;
 
 OAuthNetworkAccessManager* OAuthNetworkAccessManager::getInstance() {
     if (!oauthNetworkAccessManagers.hasLocalData()) {
-        oauthNetworkAccessManagers.setLocalData(new OAuthNetworkAccessManager());
+        oauthNetworkAccessManagers.setLocalData(new OAuthNetworkAccessManagerBox{ new OAuthNetworkAccessManager() });
     }
-    
-    return oauthNetworkAccessManagers.localData();
+
+    return oauthNetworkAccessManagers.localData()->manager;
 }
 
 QNetworkReply* OAuthNetworkAccessManager::createRequest(QNetworkAccessManager::Operation op, const QNetworkRequest& req,

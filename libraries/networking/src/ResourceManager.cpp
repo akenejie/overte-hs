@@ -42,9 +42,11 @@ ResourceManager::ResourceManager(bool atpSupportEnabled) : _atpSupportEnabled(at
     if (_atpSupportEnabled) {
         auto assetClient = DependencyManager::set<AssetClient>();
         assetClient->moveToThread(&_thread);
-        QObject::connect(&_thread, &QThread::started, assetClient.data(), [assetClient, name] {
+        QObject::connect(&_thread, &QThread::started, assetClient.data(), [weak = QWeakPointer<AssetClient>(assetClient), name] {
             setThreadName(name.toStdString());
-            assetClient->initCaching();
+            if (auto ac = weak.lock()) {
+                ac->initCaching();
+            }
         });
     }
 

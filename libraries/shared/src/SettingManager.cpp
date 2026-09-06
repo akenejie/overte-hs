@@ -92,8 +92,11 @@ namespace Setting {
         // This one is blocking because we want to wait until it's actually processed.
         connect(this, &Manager::terminationRequested, worker, &WriteWorker::terminate, Qt::BlockingQueuedConnection);
 
-
-        _workerThread.start();
+        // The writer thread is NOT started here: it must only run once the
+        // QCoreApplication exists, otherwise its event loop has no dispatcher
+        // and QThread::exec fails ("QEventLoop: Cannot be used without
+        // QApplication"). It is started by Setting::setupSettingsSaveThread(),
+        // which Qt invokes while constructing the QCoreApplication.
 
         // Load all current settings
         QSettings settings;
@@ -165,6 +168,10 @@ namespace Setting {
 
     void Manager::forceSave() {
         emit syncRequested();
+    }
+
+void Manager::startWriterThread() {
+        _workerThread.start();
     }
 
     void Manager::terminateThread() {

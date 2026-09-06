@@ -216,6 +216,17 @@ namespace Setting {
          */
         void terminateThread();
 
+        /**
+         * @brief Start the writer thread.
+         *
+         * Must only run while QCoreApplication exists, so the thread's event
+         * loop gets a Qt event dispatcher. Starting it earlier (before the app
+         * is constructed) makes QThread::exec fail with
+         * "QEventLoop: Cannot be used without QApplication" and the thread
+         * never processes queued writes.
+         */
+        void startWriterThread();
+
     signals:
         /**
          * @brief The value of a setting was changed

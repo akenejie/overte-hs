@@ -51,8 +51,6 @@ AudioInjectorManager::~AudioInjectorManager() {
         _thread->quit();
         _thread->wait();
     }
-
-    moveToThread(qApp->thread());
 }
 
 void AudioInjectorManager::createThread() {
