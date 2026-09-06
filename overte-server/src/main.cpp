@@ -1199,15 +1199,18 @@ LONG WINAPI crashDiagnosticFilter(EXCEPTION_POINTERS* ep) {
 // dump can only be written from this signal handler, which runs in ordinary
 // execution context with the whole stack (abort's caller frames included) intact.
 static void abortCaptureFilter(int sig) {
-    FILE* file = nullptr;
-    {
-        const QString dataDir = PathUtils::appDataDir();
-        const std::string path = (dataDir.isEmpty() ? QStringLiteral("crashdbg.log")
-                                                    : dataDir + QStringLiteral("/crashdbg.log"))
-                                     .toLocal8Bit()
-                                     .toStdString();
-        file = fopen(path.c_str(), "a");
+    // Kernel/CWD-span only: this runs on the CRT signal path after a possible
+    // fatal inconsistency, so no Qt, no heap allocation beyond fopen's own.
+    char cwd[MAX_PATH] = { 0 };
+    if (GetCurrentDirectoryA(MAX_PATH, cwd) == 0) {
+        cwd[0] = '.';
+        cwd[1] = '\0';
     }
+    char logPath[MAX_PATH] = { 0 };
+    snprintf(logPath, sizeof(logPath), "%s\\crashdbg_abort.log", cwd);
+    char dumpPath[MAX_PATH] = { 0 };
+    snprintf(dumpPath, sizeof(dumpPath), "%s\\crashdbg_abort.dmp", cwd);
+    FILE* file = fopen(logPath, "a");
     if (file) {
         std::fprintf(file, "\n[CRASH-DBG] SIGABRT(%d) thread %lu, abort called from %p\n", sig,
                      (unsigned long)GetCurrentThreadId(), _ReturnAddress());
@@ -1220,12 +1223,7 @@ static void abortCaptureFilter(int sig) {
                                                   PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
         const auto miniDumpWriteDump = (MiniDumpWriteDump_t)GetProcAddress(dumpDll, "MiniDumpWriteDump");
         if (miniDumpWriteDump) {
-            const QString dumpDataDir = PathUtils::appDataDir();
-            const std::string dumpPath = (dumpDataDir.isEmpty() ? QStringLiteral("crashdbg_abort.dmp")
-                                                                : dumpDataDir + QStringLiteral("/crashdbg_abort.dmp"))
-                                             .toLocal8Bit()
-                                             .toStdString();
-            const HANDLE dumpFile = CreateFileA(dumpPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+            const HANDLE dumpFile = CreateFileA(dumpPath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                                 FILE_ATTRIBUTE_NORMAL, nullptr);
             if (dumpFile != INVALID_HANDLE_VALUE) {
                 const DWORD dumpFlags = 0x00000002 // MiniDumpWithFullMemory
